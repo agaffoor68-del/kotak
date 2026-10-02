@@ -1,5 +1,15 @@
 """Smoke test for the core layer: database, security, session, indicators."""
 
+import os
+
+# Supply throwaway secrets so this script runs standalone, exactly as the other
+# smoke tests do. The core layer refuses to mint tokens without them, and a
+# local run has no .env loaded unless the app bootstrap was imported first.
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-local-verification")
+os.environ.setdefault("CREDENTIAL_ENCRYPTION_KEY", "test-encryption-key-for-local-verification")
+os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-local-verification")
+os.environ.setdefault("KOTAK_KEEPALIVE", "0")
+
 from backend.core.database import initialise, app_cursor
 from backend.core.security import (
     hash_password, verify_password, create_access_token, decode_access_token, generate_api_key, verify_api_key,

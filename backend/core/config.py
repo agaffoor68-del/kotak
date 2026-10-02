@@ -108,6 +108,20 @@ class Settings:
         self.public_url = os.getenv("PUBLIC_URL", "").rstrip("/")
         self.frontend_url = os.getenv("FRONTEND_URL", "").rstrip("/")
 
+        # Outside production the terminal is routinely opened from a phone or a
+        # LAN address rather than localhost, and that address moves with DHCP.
+        # Pinning one origin works until the lease renews, and then every request
+        # fails as "Failed to fetch" with nothing in the browser console to
+        # explain it. Development therefore accepts any http(s) origin, which is
+        # safe here because auth is a bearer token in sessionStorage (a foreign
+        # site cannot read it) and no cookie is ever issued. Production stays on
+        # the strict ALLOWED_ORIGINS list above.
+        self.allowed_origin_regex = (
+            None
+            if self.is_production
+            else os.getenv("ALLOWED_ORIGIN_REGEX", r"https?://.*").strip() or None
+        )
+
         # --- feature gates -----------------------------------------------
         self.enable_live_trading = _flag("ENABLE_LIVE_TRADING", False)
         self.enable_paper_trading = _flag("ENABLE_PAPER_TRADING", True)

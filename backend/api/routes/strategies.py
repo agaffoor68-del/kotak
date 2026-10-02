@@ -15,7 +15,7 @@ from backend.core.config import settings
 from backend.core.database import app_cursor, now, row_to_dict
 from backend.execution import algo
 from backend.marketdata import master, ticks
-from backend.strategies import dsl
+from backend.strategies import dsl, lifecycle, pine
 from backend.strategies.dsl import COMPARATORS, CROSS_OPS, PRICE_FIELDS
 from backend.strategies.indicators import available
 from backend.strategies.templates import TEMPLATES
@@ -40,6 +40,19 @@ class BacktestRequest(BaseModel):
 
 class StartRunRequest(BaseModel):
     mode: str = Field(default="paper", pattern="^(paper|live)$")
+
+
+class PineImportRequest(BaseModel):
+    code: str = Field(min_length=1)
+    name: str | None = None
+    timeframe: str | None = None
+    token: str = "26000"
+    label: str = "NIFTY 50"
+
+
+class PineExportRequest(BaseModel):
+    definition: dict[str, Any] | None = None
+    strategy_id: str | None = None
 
 
 @router.get("/indicators")
@@ -98,6 +111,41 @@ def explain_strategy(payload: dict[str, Any], user: CurrentUser = Depends(curren
         "result": dsl.explain(node or definition.get("entry"), cache, len(candles) - 1),
         "exit_result": dsl.explain(definition.get("exit"), cache, len(candles) - 1),
     }
+
+
+# ---------------------------------------------------------------- pine script
+
+
+@router.post("/pine/import")
+def import_pine(payload: PineImportRequest, user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    """Convert a supported subset of Pine Script into a strategy document.
+
+    Only the rules this platform can evaluate are translated; anything else is
+    reported in ``warnings`` rather than being guessed at.
+    """
+    return pine.import_pine(
+        payload.code,
+        name=payload.name,
+        timeframe=payload.timeframe,
+        token=payload.token,
+        label=payload.label,
+    )
+
+
+@router.post("/pine/export")
+def export_pine(payload: PineExportRequest, user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    """Render a strategy document (or a saved strategy) as Pine Script v5."""
+    definition = payload.definition
+    if definition is None and payload.strategy_id:
+        with app_cursor() as cursor:
+            cursor.execute("SELECT definition FROM strategies WHERE id = ?", (payload.strategy_id,))
+            row = cursor.fetchone()
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Strategy not found")
+        definition = json.loads(row["definition"])
+    if definition is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Provide a definition or a strategy_id")
+    return pine.export_pine(definition)
 
 
 @router.get("")
@@ -167,6 +215,69 @@ def delete_strategy(strategy_id: str, user: CurrentUser = Depends(current_user))
     return {"deleted": True, "id": strategy_id}
 
 
+# -------------------------------------------------------------- approval flow
+
+
+class PromoteRequest(BaseModel):
+    to_state: str
+    reason: str = Field(default="", max_length=500)
+
+
+def _load_strategy(strategy_id: str, user: CurrentUser) -> dict[str, Any]:
+    with app_cursor() as cursor:
+        cursor.execute("SELECT * FROM strategies WHERE id = ?", (strategy_id,))
+        row = row_to_dict(cursor.fetchone())
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Strategy not found")
+    if row["account_id"] != resolve_account_id(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "That strategy belongs to another account")
+    return row
+
+
+@router.get("/lifecycle/states")
+def lifecycle_states(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    """The pipeline and its thresholds, so the UI renders the same rules."""
+    return {
+        "states": list(lifecycle.STATES),
+        "transitions": {k: sorted(v) for k, v in lifecycle.TRANSITIONS.items()},
+        "forward_requirements": {
+            "min_seconds": lifecycle.MIN_FORWARD_SECONDS,
+            "min_trades": lifecycle.FORWARD_MIN_TRADES,
+            "max_drawdown_pct": lifecycle.FORWARD_MAX_DRAWDOWN_PCT,
+        },
+    }
+
+
+@router.get("/{strategy_id}/lifecycle")
+def strategy_lifecycle(strategy_id: str, user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    row = _load_strategy(strategy_id, user)
+    state = lifecycle.current_state(row)
+    return {
+        "strategy_id": strategy_id,
+        "state": state,
+        "approved_by": row.get("approved_by"),
+        "approved_at": row.get("approved_at"),
+        "allowed_transitions": sorted(lifecycle.TRANSITIONS.get(state, set())),
+        "backtest": lifecycle.backtest_evidence(strategy_id),
+        "forward": lifecycle.forward_evidence(strategy_id),
+        "history": lifecycle.history(strategy_id),
+    }
+
+
+@router.post("/{strategy_id}/lifecycle")
+def promote_strategy(
+    strategy_id: str,
+    payload: PromoteRequest,
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Advance a strategy through backtest -> forward test -> approval -> live."""
+    row = _load_strategy(strategy_id, user)
+    try:
+        return lifecycle.promote(row, payload.to_state, user.email, payload.reason or None)
+    except lifecycle.LifecycleError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+
+
 # ---------------------------------------------------------------- backtesting
 
 
@@ -213,5 +324,29 @@ def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)
         definition, candles_by_symbol,
         initial_capital=payload.initial_capital, slippage=payload.slippage, timeframe=interval,
     )
-    return {**result.to_dict(), "coverage": coverage, "interval": interval}
+    payload_dict = result.to_dict()
+
+    # Persist the run so the approval lifecycle has evidence to check. Without
+    # this a strategy could never legitimately reach "backtested".
+    if payload.strategy_id:
+        with app_cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO strategy_runs
+                    (id, strategy_id, account_id, mode, status, params, metrics, started_at, finished_at)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    uuid.uuid4().hex, payload.strategy_id, resolve_account_id(user), "backtest", "completed",
+                    json.dumps({
+                        "initial_capital": payload.initial_capital,
+                        "slippage": payload.slippage,
+                        "interval": interval,
+                    }),
+                    json.dumps(payload_dict.get("metrics") or {}),
+                    now(), now(),
+                ),
+            )
+
+    return {**payload_dict, "coverage": coverage, "interval": interval}
 

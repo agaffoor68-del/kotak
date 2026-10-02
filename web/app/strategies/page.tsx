@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { IndicatorCatalog, StrategyRowRecord } from "@/lib/api";
+import type { IndicatorCatalog, PineImportResult, StrategyRowRecord } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
 import { Empty, ErrorNote, Field, Panel, StatusChip } from "@/components/ui";
 
@@ -38,7 +38,28 @@ function newNode(): Node {
 
 const PERIOD_KEYS = ["period", "fast", "slow", "signal", "length", "deviations", "multiplier"] as const;
 
-function toDefinition(node: Node, name: string, timeframe: string, token: string, label: string) {
+/** Defaults for the parts the visual builder does not expose yet. */
+const DEFAULT_EXIT: unknown = {
+  all: [{ indicator: "rsi", params: { period: 14 }, compare: "gt", value: 70 }],
+};
+const DEFAULT_RISK: Record<string, unknown> = {
+  stop_loss_pct: 1.0,
+  target_pct: 2.0,
+  trailing_stop_pct: 0.8,
+  timeframe_exit_bars: 40,
+};
+const DEFAULT_SIZING: Record<string, unknown> = { mode: "pct_risk", risk_pct: 0.5, quantity: 1 };
+
+function toDefinition(
+  node: Node,
+  name: string,
+  timeframe: string,
+  token: string,
+  label: string,
+  exitRule: unknown = DEFAULT_EXIT,
+  risk: Record<string, unknown> = DEFAULT_RISK,
+  sizing: Record<string, unknown> = DEFAULT_SIZING,
+) {
   const convert = (input: Node): unknown => {
     if (input.kind === "group") {
       if (input.logic === "not") return { not: convert(input.children[0]) };
@@ -57,6 +78,9 @@ function toDefinition(node: Node, name: string, timeframe: string, token: string
           params: input.against.params,
           field: input.against.field ?? "value",
         };
+      } else if (input.value !== undefined) {
+        // A cross against a constant, e.g. "RSI crosses above 30".
+        base.against = { value: input.value };
       }
     } else if (input.value !== undefined) {
       base.value = input.value;
@@ -69,19 +93,40 @@ function toDefinition(node: Node, name: string, timeframe: string, token: string
     timeframe,
     universe: [{ token, exchange_segment: "nse_cm", label }],
     entry: convert(node),
-    exit: {
-      all: [
-        {
-          indicator: "rsi",
-          params: { period: 14 },
-          compare: "gt",
-          value: 70,
-        },
-      ],
-    },
-    risk: { stop_loss_pct: 1.0, target_pct: 2.0, trailing_stop_pct: 0.8, timeframe_exit_bars: 40 },
-    position_sizing: { mode: "pct_risk", risk_pct: 0.5, quantity: 1 },
+    exit: exitRule,
+    risk,
+    position_sizing: sizing,
   };
+}
+
+/** Convert a DSL rule node back into the visual editor's shape. */
+function toNode(node: unknown): Node {
+  if (node && typeof node === "object") {
+    const record = node as Record<string, unknown>;
+    if (Array.isArray(record.all)) return { kind: "group", logic: "all", children: record.all.map(toNode) };
+    if (Array.isArray(record.any)) return { kind: "group", logic: "any", children: record.any.map(toNode) };
+    if (record.not !== undefined) return { kind: "group", logic: "not", children: [toNode(record.not)] };
+
+    const condition: Condition = {
+      kind: "condition",
+      indicator: String(record.indicator ?? "ema"),
+      field: String(record.field ?? "value"),
+      params: (record.params as Condition["params"]) ?? {},
+      compare: String(record.compare ?? "gt"),
+    };
+    const against = record.against as
+      | { indicator?: string; params?: Record<string, number>; field?: string; value?: number }
+      | undefined;
+    if (against?.indicator) {
+      condition.against = { indicator: against.indicator, params: against.params ?? {}, field: against.field ?? "value" };
+    } else if (against?.value !== undefined) {
+      condition.value = against.value;
+    } else if (record.value !== undefined) {
+      condition.value = Number(record.value);
+    }
+    return condition;
+  }
+  return { ...DEFAULT_CONDITION };
 }
 
 function StrategyBuilder() {
@@ -93,6 +138,9 @@ function StrategyBuilder() {
   const [token, setToken] = useState("26000");
   const [label, setLabel] = useState("NIFTY 50");
   const [entry, setEntry] = useState<Node>(newNode());
+  const [exitRule, setExitRule] = useState<unknown>(DEFAULT_EXIT);
+  const [risk, setRisk] = useState<Record<string, unknown>>(DEFAULT_RISK);
+  const [sizing, setSizing] = useState<Record<string, unknown>>(DEFAULT_SIZING);
   const [validation, setValidation] = useState<{ valid: boolean; errors: string[] } | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -111,8 +159,8 @@ function StrategyBuilder() {
   }, []);
 
   const definition = useMemo(
-    () => toDefinition(entry, name, timeframe, token, label),
-    [entry, name, timeframe, token, label],
+    () => toDefinition(entry, name, timeframe, token, label, exitRule, risk, sizing),
+    [entry, name, timeframe, token, label, exitRule, risk, sizing],
   );
 
   // Validate as the user builds, debounced.
@@ -139,6 +187,23 @@ function StrategyBuilder() {
       setBusy(false);
     }
   }, [name, definition]);
+
+  /** Load a Pine Script conversion into the visual builder. */
+  const applyPine = useCallback((result: PineImportResult) => {
+    const imported = result.definition ?? {};
+    setName(String(imported.name ?? "Imported Pine strategy"));
+    setTimeframe(String(imported.timeframe ?? "5m"));
+    const universe = (imported.universe as { token?: string; label?: string }[] | undefined) ?? [];
+    if (universe[0]) {
+      setToken(String(universe[0].token ?? "26000"));
+      setLabel(String(universe[0].label ?? "NIFTY 50"));
+    }
+    if (imported.entry) setEntry(toNode(imported.entry));
+    if (imported.exit) setExitRule(imported.exit);
+    if (imported.risk) setRisk(imported.risk as Record<string, unknown>);
+    if (imported.position_sizing) setSizing(imported.position_sizing as Record<string, unknown>);
+    setSaved(null);
+  }, []);
 
   const applyTemplate = useCallback((template: Record<string, unknown>) => {
     const def = template.definition as Record<string, unknown> | undefined;
@@ -221,6 +286,8 @@ function StrategyBuilder() {
 
         {/* ---------------- side ---------------- */}
         <div className="space-y-4">
+          <PinePanel definition={definition} onImport={applyPine} />
+
           <Panel
             title="Validation"
             actions={validation ? (validation.valid ? <StatusChip status="live" label="valid" /> : <StatusChip status="error" label="invalid" />) : null}
@@ -465,6 +532,119 @@ function ConditionEditor({
         </label>
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------- pine script */
+
+function PinePanel({ definition, onImport }: { definition: unknown; onImport: (result: PineImportResult) => void }) {
+  const [tab, setTab] = useState<"import" | "export">("import");
+  const [code, setCode] = useState("");
+  const [exported, setExported] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [notes, setNotes] = useState<string[]>([]);
+  const textarea = "h-40 w-full overflow-auto rounded border border-hairline bg-canvas p-2 font-mono text-2xs text-ink-dim";
+
+  const runImport = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    setWarnings([]);
+    setNotes([]);
+    try {
+      const result = await api.importPine({ code });
+      setWarnings(result.warnings ?? []);
+      setNotes(result.errors ?? []);
+      if (result.valid) onImport(result);
+      else setError("The Pine Script could not be fully converted. See the notes below.");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not parse the Pine Script");
+    } finally {
+      setBusy(false);
+    }
+  }, [code, onImport]);
+
+  const runExport = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    setWarnings([]);
+    setNotes([]);
+    try {
+      const result = await api.exportPine(definition);
+      setExported(result.code);
+      setWarnings(result.warnings ?? []);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not export the strategy");
+    } finally {
+      setBusy(false);
+    }
+  }, [definition]);
+
+  return (
+    <Panel title="Pine Script" subtitle="Import from TradingView or export to it">
+      <div className="mb-3 flex gap-1">
+        <button className={`btn btn-sm ${tab === "import" ? "btn-primary" : ""}`} onClick={() => setTab("import")} type="button">
+          Import
+        </button>
+        <button className={`btn btn-sm ${tab === "export" ? "btn-primary" : ""}`} onClick={() => setTab("export")} type="button">
+          Export
+        </button>
+      </div>
+
+      {error ? <ErrorNote error={error} /> : null}
+
+      {tab === "import" ? (
+        <div className="space-y-2">
+          <textarea
+            className={textarea}
+            placeholder='//@version=5\nstrategy("My strategy")\nentry = ta.crossover(ta.ema(close, 20), ta.ema(close, 50))\nif entry\n    strategy.entry("Long", strategy.long)'
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+          />
+          <button className="btn btn-primary w-full" onClick={() => void runImport()} disabled={busy || !code.trim()} type="button">
+            {busy ? "Converting…" : "Convert to strategy"}
+          </button>
+          <p className="text-3xs leading-relaxed text-ink-faint">
+            Supported: ta.sma/ema/wma/rsi/atr/vwap/obv/cmf/macd/bb/dmi/stoch/supertrend/ichimoku,
+            comparisons, ta.crossover/crossunder, and / or / not, strategy.entry/close/exit.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <button className="btn btn-primary w-full" onClick={() => void runExport()} disabled={busy} type="button">
+            {busy ? "Generating…" : "Generate Pine Script"}
+          </button>
+          {exported ? (
+            <>
+              <textarea readOnly className={textarea} value={exported} />
+              <button className="btn btn-sm w-full" onClick={() => void navigator.clipboard?.writeText(exported)} type="button">
+                Copy to clipboard
+              </button>
+            </>
+          ) : (
+            <p className="text-3xs text-ink-faint">
+              Generate the current strategy as Pine Script v5, ready to paste into TradingView.
+            </p>
+          )}
+        </div>
+      )}
+
+      {notes.length ? (
+        <ul className="mt-3 space-y-1 text-2xs text-down">
+          {notes.map((message) => (
+            <li key={message}>• {message}</li>
+          ))}
+        </ul>
+      ) : null}
+      {warnings.length ? (
+        <ul className="mt-3 space-y-1 text-2xs text-ink-faint">
+          {warnings.map((message) => (
+            <li key={message}>• {message}</li>
+          ))}
+        </ul>
+      ) : null}
+    </Panel>
   );
 }
 

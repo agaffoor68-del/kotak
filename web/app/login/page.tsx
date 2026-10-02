@@ -1,13 +1,9 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { loadToken } from "@/lib/api";
-import { LoginForm } from "./login-form";
+import { LoginGate } from "./login-gate";
 
 export const metadata: Metadata = { title: "Sign in — AlphaTradePro" };
 
 export default function LoginPage() {
-  // A still-valid token goes straight to the desk.
-  if (loadToken()) redirect("/dashboard");
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Brand panel — hidden on small screens so the form owns the viewport. */}
@@ -60,7 +56,7 @@ export default function LoginPage() {
               <span className="text-base font-semibold">AlphaTradePro</span>
             </div>
           </div>
-          <LoginForm />
+          <LoginGate />
         </div>
       </section>
     </div>

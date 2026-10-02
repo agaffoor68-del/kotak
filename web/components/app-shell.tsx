@@ -10,6 +10,7 @@ import type { MarketStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useLiveFeed } from "@/lib/useLiveFeed";
 import { clock, compact } from "@/lib/format";
+import { BootScreen } from "./boot-screen";
 import { SessionChip, StatusChip } from "./ui";
 
 interface NavItem {
@@ -101,14 +102,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   if (!ready || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex items-center gap-3 text-ink-faint">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-edge border-t-accent" />
-          <span className="text-xs uppercase tracking-widest">Loading AlphaTradePro</span>
-        </div>
-      </div>
-    );
+    return <BootScreen />;
   }
 
   const brokerLive = status?.broker_session?.authenticated === true;

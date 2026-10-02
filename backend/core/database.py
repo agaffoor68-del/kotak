@@ -75,6 +75,27 @@ def initialise() -> None:
         cursor.executescript(APP_SCHEMA)
     with market_cursor() as cursor:
         cursor.executescript(MARKET_SCHEMA)
+    _migrate_app_schema()
+
+
+def _migrate_app_schema() -> None:
+    """Additive migrations for databases created before a column existed.
+
+    `CREATE TABLE IF NOT EXISTS` leaves an already-created table untouched, so a
+    new column silently does not appear on an existing install. Adding it here
+    keeps upgrades safe without needing to drop user data.
+    """
+    with app_cursor() as cursor:
+        cursor.execute("PRAGMA table_info(strategies)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        additions = (
+            ("lifecycle", "ALTER TABLE strategies ADD COLUMN lifecycle TEXT NOT NULL DEFAULT 'draft'"),
+            ("approved_by", "ALTER TABLE strategies ADD COLUMN approved_by TEXT"),
+            ("approved_at", "ALTER TABLE strategies ADD COLUMN approved_at REAL"),
+        )
+        for name, statement in additions:
+            if name not in columns:
+                cursor.execute(statement)
 
 
 # ---------------------------------------------------------------- app schema
@@ -146,10 +167,40 @@ CREATE TABLE IF NOT EXISTS strategies (
     kind        TEXT NOT NULL DEFAULT 'rule',
     definition  TEXT NOT NULL,
     is_template INTEGER NOT NULL DEFAULT 0,
+    lifecycle    TEXT NOT NULL DEFAULT 'draft',
+    approved_by  TEXT,
+    approved_at  REAL,
     created_at  REAL NOT NULL,
     updated_at  REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_strategies_account ON strategies(account_id);
+
+-- Every edit to a definition is kept, so a strategy that is trading can always be
+-- traced back to the exact rules the user approved.
+CREATE TABLE IF NOT EXISTS strategy_versions (
+    id          TEXT PRIMARY KEY,
+    strategy_id TEXT NOT NULL,
+    version     INTEGER NOT NULL,
+    definition  TEXT NOT NULL,
+    note        TEXT,
+    created_by  TEXT,
+    created_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_versions_strategy ON strategy_versions(strategy_id, version DESC);
+
+-- Append-only record of every lifecycle decision, including refusals. This is the
+-- audit trail for "the user always has final control over live deployment".
+CREATE TABLE IF NOT EXISTS strategy_approvals (
+    id          TEXT PRIMARY KEY,
+    strategy_id TEXT NOT NULL,
+    from_state  TEXT NOT NULL,
+    to_state    TEXT NOT NULL,
+    actor       TEXT NOT NULL,
+    reason      TEXT,
+    evidence    TEXT,
+    created_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_approvals_strategy ON strategy_approvals(strategy_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS strategy_runs (
     id          TEXT PRIMARY KEY,

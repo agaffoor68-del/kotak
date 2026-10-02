@@ -105,15 +105,27 @@ export function setToken(token: string | null) {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   await ensureApiBase();
   const token = loadToken();
-  const response = await fetch(`${base}${path}`, {
-    cache: "no-store",
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, {
+      cache: "no-store",
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch {
+    // `fetch` rejects for three very different reasons — the API is not
+    // running, the host is wrong, or the browser blocked the response on CORS —
+    // and it reports all of them as a bare "Failed to fetch". Say which host was
+    // tried so the cause is obvious instead of a dead end.
+    throw new ApiError(
+      `Cannot reach the backend at ${base}. Check that it is running and that this page's origin is allowed by ALLOWED_ORIGINS.`,
+      0,
+    );
+  }
 
   const text = await response.text();
   let payload: unknown = null;
@@ -462,6 +474,18 @@ export interface StrategyRowRecord {
   validation?: { valid: boolean; errors: string[] };
 }
 
+export interface PineImportResult {
+  definition: Record<string, unknown>;
+  warnings: string[];
+  errors: string[];
+  valid: boolean;
+}
+
+export interface PineExportResult {
+  code: string;
+  warnings: string[];
+}
+
 export const api = {
   health: () => request<Record<string, unknown>>("/api/v1/system/health"),
 
@@ -529,6 +553,10 @@ export const api = {
   deleteStrategy: (id: string) => del<{ deleted: boolean }>(`/api/v1/strategies/${id}`),
   validateStrategy: (definition: unknown) =>
     post<{ valid: boolean; errors: string[] }>("/api/v1/strategies/validate", definition),
+  importPine: (body: { code: string; name?: string; timeframe?: string; token?: string; label?: string }) =>
+    post<PineImportResult>("/api/v1/strategies/pine/import", body),
+  exportPine: (definition: unknown) =>
+    post<PineExportResult>("/api/v1/strategies/pine/export", { definition }),
   backtest: (body: {
     strategy_id?: string;
     definition?: unknown;

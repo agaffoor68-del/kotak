@@ -1,9 +1,0 @@
-{
-    // Tailwind processes @tailwind / @apply via PostCSS (web/postcss.config.js)
-    // before the browser ever sees the CSS, so the built-in CSS language service
-    // reports them as unknown at-rules. They are valid here.
-    "css.lint.unknownAtRules": "ignore",
-    // This project intentionally ships no autoprefixer, so prefixed properties
-    // such as -webkit-appearance are the only form used.
-    "css.lint.vendorPrefix": "ignore"
-}

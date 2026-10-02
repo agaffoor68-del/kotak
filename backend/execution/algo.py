@@ -86,6 +86,12 @@ class AlgoSupervisor:
             raise ValueError("Algo live execution is disabled. Set ENABLE_ALGO_EXECUTION=1 to enable it.")
         if mode == "live" and not settings.enable_live_trading:
             raise ValueError("Live trading is disabled. Set ENABLE_LIVE_TRADING=1 to enable it.")
+        if mode == "live":
+            # The approval gate. Enforced here rather than only in the API layer so
+            # no internal caller can put an unapproved strategy on real money.
+            from backend.strategies import lifecycle
+
+            lifecycle.assert_live_allowed(strategy)
 
         interval = str(definition.get("timeframe") or "5m")
         if interval not in ticks.INTERVAL_SECONDS:

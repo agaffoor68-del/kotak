@@ -14,3 +14,16 @@ var/
 nginx/certs/
 nginx/certbot/
 fly.toml
+
+# --- local scratch / diagnostics (never commit) ---
+/_*.txt
+/_*.py
+/*.log
+/*.err
+web/*.log
+web/*.err
+web/t.log
+*.tsbuildinfo
+.vscode/
+*.sqlite3
+*.db
