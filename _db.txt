@@ -1,0 +1,3 @@
+﻿USERS:
+{'id': '464f15d978554744b4040d77b7a001fc', 'email': 'admin@alphatrade.local', 'role': 'admin', 'is_active': 1, 'last_login_at': 1790709707.386152}
+ACCOUNTS:

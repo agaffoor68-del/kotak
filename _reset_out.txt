@@ -1,0 +1,8 @@
+rc=0
+--- stdout ---
+
+created: demo@alphatrade.local  role=admin  active=yes
+Sign in at http://localhost:3000/login with the password you just set.
+--- stderr ---
+INFO     Using state database C:\Users\SEMISTAR\Downloads\kotak\var\master.sqlite3
+INFO     Created demo@alphatrade.local (521204f2a85548adbf5740319482fdf7) as admin

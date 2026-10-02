@@ -1,0 +1,60 @@
+
+> dev
+> next dev
+
+   ▲ Next.js 15.5.26
+   - Local:        http://localhost:3000
+   - Network:      http://172.21.116.121:3000
+
+ ✓ Starting...
+ ✓ Ready in 3.4s
+ ○ Compiling /alerts ...
+ ✓ Compiled /risk in 8.1s (659 modules)
+ GET /alerts 200 in 8530ms
+ GET /analytics 200 in 8282ms
+ GET /coach 200 in 8284ms
+ GET /backtest 200 in 8279ms
+ GET /settings 200 in 8848ms
+ GET /risk 200 in 6487ms
+ ○ Compiling /options ...
+ ✓ Compiled /options in 1528ms (668 modules)
+ GET /market 200 in 1795ms
+ GET /options 200 in 1799ms
+ GET /dashboard 200 in 1854ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 536ms (673 modules)
+ GET /api/v1/system/health 404 in 804ms
+ GET /api/v1/system/health 404 in 800ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1595ms (636 modules)
+ GET /login 200 in 2524ms
+ ✓ Compiled /market in 398ms (388 modules)
+ GET /market 200 in 569ms
+ ✓ Compiled /dashboard in 305ms (394 modules)
+ GET /dashboard 200 in 422ms
+ GET /market 200 in 39ms
+ ✓ Compiled /options in 219ms (399 modules)
+ GET /options 200 in 340ms
+ GET /options 200 in 45ms
+ ○ Compiling /portfolio ...
+ ✓ Compiled /portfolio in 1068ms (660 modules)
+ GET /portfolio 200 in 1205ms
+ ✓ Compiled /trade in 513ms (667 modules)
+ GET /trade 200 in 665ms
+ GET /risk 200 in 58ms
+ ○ Compiling /paper ...
+ ✓ Compiled /paper in 694ms (674 modules)
+ GET /paper 200 in 848ms
+ ○ Compiling /strategies ...
+ ✓ Compiled /strategies in 700ms (681 modules)
+ GET /strategies 200 in 1100ms
+ GET /strategies 200 in 238ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 752ms (676 modules)
+ GET /api/v1/system/health 404 in 956ms
+ GET /api/v1/system/health 404 in 942ms
+ GET /strategies 200 in 283ms
+ GET /strategies 200 in 185ms
+ GET /api/v1/system/health 404 in 118ms
+ GET /api/v1/system/health 404 in 116ms
+ GET /login 200 in 135ms

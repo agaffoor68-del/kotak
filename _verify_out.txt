@@ -1,0 +1,2 @@
+health 200 {"status":"ok","time":1790948662.9317935,"environment":"development","broker":"kotak_neo","feed":{"status":"reconnecting","account_id":null,"connected_at":null,"last_message_at":null,"seconds_since_me
+login 200 role=admin token_len=248

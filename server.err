@@ -1,0 +1,598 @@
+INFO:     Started server process [4348]
+INFO:     Waiting for application startup.
+2026-10-02 12:32:19,323 INFO     alphatrade.bootstrap: AlphaTradePro backend ready (env=development)
+2026-10-02 12:32:19,323 INFO     alphatrade: Environment: development
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-10-02 12:32:20,063 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:22,353 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:26,744 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:26,744 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:27,033 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:29,283 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:33,524 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:33,524 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:34,774 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:37,182 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:41,489 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:41,489 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:43,839 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:46,073 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:50,334 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:50,334 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:54,654 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:32:56,974 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:01,274 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:01,274 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:09,534 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:12,055 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:16,295 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:16,295 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:32,601 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:34,845 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:39,115 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:33:39,115 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:34:09,338 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:34:11,596 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:34:15,835 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:34:15,835 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:34:46,206 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:34:48,566 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:34:52,897 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:34:52,897 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:35:23,129 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:35:25,359 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:35:29,727 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:35:29,727 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:35:59,988 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:36:02,248 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:36:06,538 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:36:06,538 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:36:36,899 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:36:39,129 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:36:43,499 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:36:43,499 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:13,885 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:16,230 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:20,480 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:20,480 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:27,010 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:29,341 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:33,660 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:33,660 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:50,800 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:53,100 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:57,442 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:37:57,442 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:38:27,692 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:38:30,086 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:38:34,451 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:38:34,451 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:39:04,879 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:39:07,221 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:39:11,537 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:39:11,537 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:39:41,897 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:39:44,204 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:39:48,504 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:39:48,505 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:40:18,903 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:40:21,193 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:40:25,493 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:40:25,493 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:40:55,725 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:40:57,937 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:41:02,276 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:41:02,276 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:41:32,640 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:41:34,990 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:41:39,255 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:41:39,255 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:09,648 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:11,857 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:16,075 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:16,075 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:33,918 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:36,159 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:40,676 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:40,676 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:46,336 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:49,028 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:53,312 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:42:53,313 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:43:23,617 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:43:25,937 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:43:30,207 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:43:30,207 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:44:00,422 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:44:02,658 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:44:06,883 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:44:06,883 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:44:37,206 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:44:39,648 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:44:43,889 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:44:43,889 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:45:14,299 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:45:16,619 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:45:21,010 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:45:21,010 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:45:51,310 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:45:53,650 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:45:58,250 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:45:58,250 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:46:28,631 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:46:30,891 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:46:35,191 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:46:35,191 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:05,461 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:07,793 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:12,201 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:12,201 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:41,072 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:43,312 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:47,557 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:47,557 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:47,815 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:50,162 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:55,143 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:47:55,143 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:48:25,377 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:48:27,773 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:48:32,088 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:48:32,088 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:49:02,589 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:49:04,939 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:49:09,404 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:49:09,404 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:49:40,890 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:49:43,244 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:49:47,654 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:49:47,654 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:50:18,068 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:50:20,423 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:50:24,918 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:50:24,919 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:50:55,236 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:50:57,627 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:51:01,946 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:51:01,946 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:51:32,283 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:51:34,608 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:51:38,967 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:51:38,967 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:09,217 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:11,528 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:15,888 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:15,888 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:46,278 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:48,639 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:52,998 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:52,998 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:53,356 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:55,665 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:59,889 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:52:59,889 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:53:23,287 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:53:25,589 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:53:29,964 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:53:29,965 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:54:00,383 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:54:02,869 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:54:07,219 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:54:07,219 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:54:37,510 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:54:39,958 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:54:44,303 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:54:44,303 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:55:14,554 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:55:16,937 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:55:21,587 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:55:21,587 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:55:51,962 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:55:54,342 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:55:58,722 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:55:58,722 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:56:29,088 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:56:31,422 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:56:35,826 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:56:35,827 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:57:06,343 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:57:08,665 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:57:13,089 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:57:13,089 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:57:43,389 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:57:45,774 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:57:50,174 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:57:50,174 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:58:00,245 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:58:02,767 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:58:07,774 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:58:07,774 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:58:20,474 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:58:22,740 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:58:27,269 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:58:27,270 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:58:57,575 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:59:00,046 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:59:04,469 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:59:04,470 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:59:34,826 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:59:37,276 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:59:41,676 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 12:59:41,676 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:00:12,127 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:00:14,447 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:00:18,908 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:00:18,909 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:00:49,227 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:00:51,527 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:00:55,818 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:00:55,818 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:01:26,234 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:01:28,615 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:01:34,118 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:01:34,118 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:02:04,660 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:02:07,119 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:02:11,602 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:02:11,603 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:02:42,020 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:02:44,420 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:02:48,870 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:02:48,870 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:08,153 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:10,520 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:14,936 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:14,936 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:19,386 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:21,736 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:26,120 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:26,120 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:56,459 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:03:58,937 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:04:03,322 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:04:03,322 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:04:33,612 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:04:35,987 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:04:40,388 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:04:40,388 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:05:10,910 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:05:13,173 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:05:17,488 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:05:17,488 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:05:47,872 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:05:50,223 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:05:54,523 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:05:54,523 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:06:24,923 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:06:27,290 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:06:31,590 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:06:31,590 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:07:01,915 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:07:04,389 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:07:08,768 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:07:08,769 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:07:39,181 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:07:41,642 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:07:46,044 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:07:46,044 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:08:15,212 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:08:17,509 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:08:21,876 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:08:21,876 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:08:22,176 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:08:24,542 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:08:28,926 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:08:28,926 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:08:59,465 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:09:01,943 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:09:06,313 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:09:06,314 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:09:36,728 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:09:39,093 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:09:43,394 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:09:43,394 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:10:13,917 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:10:16,260 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:10:20,534 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:10:20,534 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:10:51,919 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:10:54,218 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:10:58,556 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:10:58,557 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:11:28,936 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:11:31,136 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:11:35,490 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:11:35,500 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:12:05,801 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:12:08,088 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:12:12,491 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:12:12,491 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:12:43,291 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:12:45,663 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:12:50,020 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:12:50,021 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:20,333 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:22,522 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:27,038 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:27,038 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:27,317 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:29,622 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:34,104 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:34,105 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:57,331 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:13:59,738 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:14:04,123 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:14:04,123 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:14:34,474 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:14:36,912 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:14:41,124 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:14:41,124 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:15:11,590 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:15:14,124 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:15:18,390 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:15:18,390 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:15:48,807 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:15:51,116 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:15:55,418 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:15:55,419 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:16:25,857 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:16:28,176 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:16:32,512 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:16:32,513 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:17:03,026 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:17:05,459 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:17:09,908 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:17:09,908 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:17:40,377 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:17:42,862 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:17:47,227 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:17:47,227 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:17,649 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:20,068 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:24,325 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:24,325 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:34,348 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:36,578 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:40,963 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:40,964 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:54,910 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:18:57,273 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:19:01,594 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:19:01,594 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:19:32,035 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:19:34,569 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:19:38,949 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:19:38,949 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:20:09,504 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:20:11,820 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:20:16,182 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:20:16,182 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:20:46,580 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:20:49,044 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:20:53,405 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:20:53,405 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:21:23,819 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:21:26,221 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:21:30,573 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:21:30,573 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+INFO:     127.0.0.1:51406 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+2026-10-02 13:22:00,962 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:22:03,369 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:22:07,703 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:22:07,703 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:22:38,045 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:22:40,313 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:22:44,603 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:22:44,603 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:14,860 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:17,180 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:21,674 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:21,674 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:41,390 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:43,854 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:48,165 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:48,166 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:52,190 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:54,555 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:59,040 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:23:59,040 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:24:29,315 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:24:31,541 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:24:35,763 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:24:35,765 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:25:06,158 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:25:08,486 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:25:12,898 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:25:12,898 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:25:43,406 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:25:45,770 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:25:50,169 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:25:50,169 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:26:20,528 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:26:22,838 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:26:27,193 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:26:27,193 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:26:57,568 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:26:59,980 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:27:04,298 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:27:04,298 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:27:34,640 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:27:37,002 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:27:41,259 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:27:41,259 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:11,540 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:13,780 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:18,000 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:18,000 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:48,300 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:50,620 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:54,970 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:54,970 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:55,201 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:28:57,541 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:29:01,960 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:29:01,960 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:29:25,342 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:29:27,601 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:29:31,981 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:29:31,981 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+INFO:     127.0.0.1:51776 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51777 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51778 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51779 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51780 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51781 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+2026-10-02 13:30:02,252 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+INFO:     127.0.0.1:51788 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51790 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51795 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51796 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+2026-10-02 13:30:04,584 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:30:08,962 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:30:08,962 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+INFO:     127.0.0.1:51812 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51816 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51817 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51818 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51819 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51820 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51829 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51833 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51836 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51837 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+2026-10-02 13:30:26,462 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+INFO:     127.0.0.1:51839 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51840 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+2026-10-02 13:30:28,822 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:30:33,103 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:30:33,342 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+INFO:     127.0.0.1:51853 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51854 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+2026-10-02 13:30:36,142 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:30:40,512 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:30:40,843 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:30:43,123 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+INFO:     127.0.0.1:51869 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51870 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+2026-10-02 13:30:47,434 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:30:47,434 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+INFO:     127.0.0.1:51882 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51883 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+2026-10-02 13:31:17,853 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:31:20,234 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:31:24,534 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:31:24,534 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+INFO:     127.0.0.1:51914 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51920 - "WebSocket /ws/market?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NjRmMTVkOTc4NTU0NzQ0YjQwNDBkNzdiN2EwMDFmYyIsInJvbGUiOiJhZG1pbiIsImFpZCI6IiIsImlhdCI6MTc5MDk2NDkxMiwiZXhwIjoxNzkxMDA4MTEyLCJqdGkiOiJjMzBkZTQwNjVjNmYzNGJmIn0.UFLSUrMR6TWNRUdpyztrmNwZ_gKPzY8fyVSmzMfDRJY" [accepted]
+INFO:     connection open
+2026-10-02 13:31:54,809 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:31:57,065 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:32:01,288 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:32:01,288 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:32:31,805 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:32:34,097 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:32:38,457 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:32:38,458 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:33:08,875 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:33:11,242 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:33:15,515 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:33:15,515 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:33:45,822 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:33:48,221 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:33:52,576 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:33:52,576 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:34:02,207 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:34:04,523 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:34:08,887 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:34:08,887 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:34:22,837 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:34:25,237 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:34:29,647 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:34:29,648 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:34:59,995 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:35:02,222 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:35:06,608 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:35:06,608 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:35:36,838 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:35:39,065 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:35:43,299 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:35:43,299 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:36:13,609 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:36:15,865 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:36:20,239 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:36:20,239 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:36:50,581 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:36:52,869 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:36:57,200 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:36:57,200 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:37:27,420 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:37:29,761 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:37:34,051 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:37:34,052 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:38:04,241 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:38:06,628 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:38:10,931 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:38:10,931 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:38:41,152 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:38:43,491 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:38:47,803 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:38:47,804 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:09,085 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:11,342 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:15,588 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:15,589 WARNING  alphatrade.neo: Keepalive could not refresh X7KT4: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:18,108 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:20,312 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:24,652 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:24,652 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:55,029 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:39:57,313 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:40:01,727 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:40:01,728 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:40:32,134 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:40:34,494 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:40:38,854 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:40:38,854 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:41:09,254 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:41:11,648 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:41:15,944 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:41:15,944 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:41:46,274 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:41:48,524 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:41:52,974 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:41:52,974 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:42:23,325 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:42:25,691 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:42:30,018 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist
+2026-10-02 13:42:30,019 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: totp_login rejected: Consumer key 1f085742-92d3-4662-bb72-ff29f712e55c does not exist

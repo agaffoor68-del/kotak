@@ -1,0 +1,35 @@
+﻿ M .vscode/settings.json
+ D _cfg.txt
+ M backend/_smoke_core.py
+ M backend/api/routes/strategies.py
+ M backend/core/config.py
+ M backend/core/database.py
+ M backend/execution/algo.py
+ M backend/main.py
+ M server.err
+ M server.log
+ M web/app/login/page.tsx
+ M web/app/page.tsx
+ M web/app/strategies/page.tsx
+ M web/components/app-shell.tsx
+ M web/lib/api.ts
+ M web/t.log
+ M web/tsconfig.tsbuildinfo
+?? _admin_check.py
+?? _admin_check.txt
+?? _admin_state.txt
+?? _gs.txt
+?? _pine_out.txt
+?? _pine_test.py
+?? _reset_out.txt
+?? _secrets.txt
+?? _sigs.txt
+?? _verify_out.txt
+?? _verify_web.txt
+?? backend/_reset_admin.py
+?? backend/strategies/lifecycle.py
+?? backend/strategies/pine.py
+?? web.err
+?? web.log
+?? web/app/login/login-gate.tsx
+?? web/components/boot-screen.tsx

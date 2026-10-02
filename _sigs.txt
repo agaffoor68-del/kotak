@@ -1,0 +1,8 @@
+﻿def stochastic_rsi(values: Sequence[Number], rsi_period: int = 14, stoch_period: int = 14,
+def stochastic(candles: Candles, period: int = 14, smooth: int = 3) -> dict[str, Series]:
+def bollinger(values: Sequence[Number], period: int = 20, deviations: float = 2.0) -> dict[str, Series]:
+def true_range(candles: Candles) -> list[Number]:
+def ichimoku(candles: Candles, conversion: int = 9, base: int = 26, span_b: int = 52) -> dict[str, list[Number]]:
+def obv(candles: Candles) -> Series:
+def cmf(candles: Candles, period: int = 20) -> Series:
+def volume_profile(candles: Candles, bins: int = 20) -> dict[str, list[Number]]:

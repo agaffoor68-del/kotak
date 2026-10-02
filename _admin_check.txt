@@ -1,0 +1,11 @@
+=== users ===
+email='admin@alphatrade.local' role='admin' active=1
+   (no candidate password matched)
+email='demo@alphatrade.local' role='admin' active=1
+   MATCHING PASSWORD -> 'AlphaDemo@2026'
+   (no candidate password matched)
+=== broker_accounts ===
+count=0
+=== api_keys ===
+count=0
+done
