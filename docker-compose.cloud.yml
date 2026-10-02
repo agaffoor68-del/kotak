@@ -55,7 +55,7 @@ services:
     volumes:
       # Docker socket so the watchdog can restart a wedged API container.
       - /var/run/docker.sock:/var/run/docker.sock
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |
         echo "watchdog up"
