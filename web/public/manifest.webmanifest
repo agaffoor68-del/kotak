@@ -1,0 +1,21 @@
+{
+  "name": "AlphaTradePro",
+  "short_name": "AlphaTrade",
+  "description": "Institutional algorithmic trading for Indian markets on Kotak Neo.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#080B12",
+  "theme_color": "#080B12",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Market overview", "url": "/market" },
+    { "name": "Order ticket", "url": "/trade" },
+    { "name": "Option chain", "url": "/options" }
+  ]
+}

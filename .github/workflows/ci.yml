@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (compile + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          # The Kotak SDK is only needed for the broker modules; the engine and
+          # API tests stub it, so a missing checkout cannot fail the build.
+          pip install "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" || echo "SDK install skipped"
+
+      - name: Compile every module
+        run: python -m compileall -q backend
+
+      - name: Engine tests (indicators, options, backtester, charges)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          PYTHONIOENCODING: utf-8
+          SECRET_KEY: ci-secret
+          CREDENTIAL_ENCRYPTION_KEY: ci-encryption-key
+          JWT_SECRET: ci-jwt-secret
+        run: |
+          python backend/_smoke_indicators.py
+          python backend/_smoke_options.py
+          python backend/_smoke_engine.py
+
+      - name: API tests (auth, RBAC, risk gates)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          PYTHONIOENCODING: utf-8
+        run: python backend/_smoke_api.py
+
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -f Dockerfile.backend -t alphatrade-backend:ci .
+      - name: Build web image
+        run: docker build -f Dockerfile.web -t alphatrade-web:ci .

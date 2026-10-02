@@ -1,0 +1,71 @@
+# Cloud overlay: `docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d`
+#
+# A single cloud VM (Hetzner, DigitalOcean, OVH, AWS EC2, ...) running this
+# overlay is the 24/7 setup: three containers, one public port, a persistent
+# volume for the recorded tape, and a watchdog that restarts the API if it
+# stops answering.
+
+services:
+  api:
+    # `always`, not `unless-stopped`: after a host reboot Docker restores the
+    # container even if someone stopped it by hand.
+    restart: always
+    environment:
+      # The browser reaches the API through nginx on the same host, so record
+      # the public origin here or CORS rejects the preflight.
+      ALLOWED_ORIGINS: ${PUBLIC_URL:-http://localhost}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      FRONTEND_URL: ${PUBLIC_URL:-}
+      TZ: Asia/Kolkata
+    volumes:
+      # Keep the existing volume from the base file, add the SQLite dbs that
+      # live outside DATA_DIR in some setups.
+      - market_data:/app/var
+
+  web:
+    restart: always
+    environment:
+      # Same origin in production, so the app never hardcodes a backend host.
+      NEXT_PUBLIC_API_BASE: ${PUBLIC_URL:-http://localhost}
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+
+  proxy:
+    restart: always
+    ports:
+      # Only 80 here: terminate TLS with certbot on the host (or at Cloudflare)
+      # rather than shipping a private key into a container.
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/alphatrade-http.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certbot:/var/www/certbot
+      - ./nginx/certs:/etc/nginx/certs:ro
+
+  # ---- layer 3 of DEPLOY.md: something outside the stack notices silence ----
+  watchdog:
+    image: curlimages/curl:8.11.1
+    container_name: alphatrade-watchdog
+    restart: always
+    depends_on:
+      - api
+    environment:
+      HEALTH_URL: http://api:8000/api/v1/system/health
+      SESSION_URL: http://api:8000/api/v1/session
+    volumes:
+      # Docker socket so the watchdog can restart a wedged API container.
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "watchdog up"
+        while true; do
+          sleep 60
+          if ! curl -fsS --max-time 10 "$$HEALTH_URL" >/dev/null 2>&1; then
+            echo "health failed, restarting api"
+            docker restart alphatrade-api || true
+          fi
+          # Session state is logged, not acted on: an expired Kotak token is a
+          # credential problem, not a process problem.
+          curl -fsS --max-time 10 "$$SESSION_URL" || echo "session check failed"
+        done

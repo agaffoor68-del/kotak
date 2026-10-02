@@ -1,0 +1,30 @@
+mc[Unit]
+Description=AlphaTradePro web terminal (Next.js standalone)
+After=network-online.target alphatrade-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alphatrade
+Group=alphatrade
+WorkingDirectory=/opt/alphatrade/web
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=TZ=Asia/Kolkata
+
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=0
+
+ExecStart=/usr/bin/node /opt/alphatrade/web/server.js
+
+StandardOutput=append:/var/log/alphatrade-web.log
+StandardError=append:/var/log/alphatrade-web.log
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,44 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    container_name: kotak-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PLATFORM_ORIGINS: ${PLATFORM_ORIGINS:-http://localhost:3000}
+      PLATFORM_PUBLIC_URL: ${PLATFORM_PUBLIC_URL:-}
+      TERMINAL_WEB_URL: ${TERMINAL_WEB_URL:-}
+      KOTAK_KEEPALIVE: "1"
+      KOTAK_KEEPALIVE_SECONDS: "300"
+      TZ: Asia/Kolkata
+    ports:
+      - "8080:8080"
+    volumes:
+      - ledger_data:/app
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/api/v1/health',timeout=5)" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: kotak-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_PLATFORM_API: ${NEXT_PUBLIC_PLATFORM_API:-http://127.0.0.1:8080}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://127.0.0.1:3000/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+volumes:
+  ledger_data:

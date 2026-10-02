@@ -1,0 +1,8 @@
+{
+  "name": "kotak-institutional-terminal",
+  "private": true,
+  "scripts": { "dev": "next dev", "build": "next build", "start": "next start" },
+  "config": { "output": "standalone" },
+  "dependencies": { "next": "^15.0.0", "react": "^19.0.0", "react-dom": "^19.0.0" },
+  "devDependencies": { "@types/node": "^22", "@types/react": "^19", "tailwindcss": "^3.4", "typescript": "^5" }
+}

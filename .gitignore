@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+creds.local.py
+order_ledger.sqlite3
+web/.next/
+web/node_modules/
+kotak_venv/
+build/
+dist/
+var/
+nginx/certs/
+nginx/certbot/
+fly.toml

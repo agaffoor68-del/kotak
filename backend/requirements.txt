@@ -1,0 +1,35 @@
+# AlphaTradePro backend requirements.
+# Install the Kotak Neo SDK from git alongside these.
+
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pydantic>=2.7,<3
+python-dotenv>=1.0,<2
+httpx>=0.27,<1
+
+# Auth: Fernet for credential encryption at rest.
+cryptography>=42,<46
+
+# Scrip-master synchronisation and CSV parsing.
+requests>=2.32,<3
+pandas>=2.2,<3
+
+# Kotak Neo TOTP login.
+pyotp>=2.9,<3
+
+# QR codes for the share link, so a phone can scan its way in.
+qrcode>=7.4,<9
+pillow>=10,<12
+
+# Alert delivery.
+# (Telegram and WhatsApp use the stdlib; SMTP is in the stdlib too.)
+
+# Optional: enables the LLM layer of the AI coach. Deterministic analysis
+# works without it.
+openai>=1,<3
+
+# Optional: PostgreSQL/Redis for multi-instance deployments. SQLite is the
+# default and needs no server.
+sqlalchemy>=2,<3
+psycopg[binary]>=3,<4
+redis>=5,<6

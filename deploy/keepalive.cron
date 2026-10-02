@@ -1,0 +1,8 @@
+# AlphaTradePro liveness checks.
+# Install to /etc/cron.d/alphatrade-keepalive (must be owned by root, mode 644).
+
+# Restart the API if the process is up but not answering.
+*/5 * * * * root curl -fsS -o /dev/null http://127.0.0.1:8000/api/v1/system/health || systemctl restart alphatrade-api
+
+# Log the Kotak session state so an expired credential is noticed early.
+*/30 * * * * root curl -fsS http://127.0.0.1:8000/api/v1/session >> /var/log/alphatrade-session.log 2>&1

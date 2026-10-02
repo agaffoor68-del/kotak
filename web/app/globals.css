@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    height: 100%;
+    background: #080b12;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    @apply bg-accent/30 text-ink;
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-canvas;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2b3648 #0e131c;
+  }
+
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  *::-webkit-scrollbar-track {
+    background: #0e131c;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #2b3648;
+    border-radius: 6px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #3b4a61;
+  }
+
+  input[type="number"] {
+    @apply font-mono;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-lg border border-hairline bg-surface shadow-panel;
+  }
+
+  .panel-head {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-3;
+  }
+
+  .panel-title {
+    @apply text-2xs font-semibold uppercase tracking-[0.14em] text-ink;
+  }
+
+  .panel-body {
+    @apply p-4;
+  }
+
+  .label-caps {
+    @apply text-3xs font-semibold uppercase tracking-[0.12em] text-ink-faint;
+  }
+
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-md border border-edge
+      bg-elevated px-3 py-2 text-2xs font-semibold uppercase tracking-wider text-ink
+      transition-colors duration-100 hover:border-ink-faint hover:bg-[#1B2433]
+      active:translate-y-px
+      disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-edge disabled:hover:bg-elevated;
+  }
+  .btn-primary {
+    @apply border-transparent bg-accent text-white hover:bg-[#2F6FE4] hover:border-transparent;
+  }
+  .btn-buy {
+    @apply border-transparent bg-up font-bold text-black hover:bg-[#1DA851] hover:border-transparent;
+  }
+  .btn-sell {
+    @apply border-transparent bg-down font-bold text-white hover:bg-[#DC2626] hover:border-transparent;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent hover:border-edge hover:bg-elevated;
+  }
+  .btn-sm {
+    @apply px-2.5 py-1.5;
+  }
+  .btn-lg {
+    @apply px-4 py-2.5 text-xs;
+  }
+
+  .field {
+    @apply flex flex-col gap-1;
+  }
+  .field-label {
+    @apply text-3xs font-semibold uppercase tracking-[0.12em] text-ink-faint;
+  }
+  .field-input,
+  .field-select {
+    @apply w-full rounded-md border border-edge bg-canvas px-3 py-2 font-mono text-sm text-ink
+      placeholder:text-ink-faint/70
+      focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50
+      disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .field-select {
+    @apply font-sans;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded border px-2 py-0.5 text-3xs font-semibold uppercase tracking-wider;
+  }
+  .chip-live {
+    @apply border-up/40 bg-up-soft text-up;
+  }
+  .chip-idle {
+    @apply border-edge bg-elevated text-ink-dim;
+  }
+  .chip-warn {
+    @apply border-warn/40 bg-warn-soft text-warn;
+  }
+  .chip-error {
+    @apply border-down/40 bg-down-soft text-down;
+  }
+  .chip-info {
+    @apply border-accent/40 bg-accent-soft text-accent;
+  }
+
+  .tbl {
+    @apply w-full text-sm;
+  }
+  .tbl thead th {
+    @apply sticky top-0 z-10 border-b border-hairline bg-surface px-3 py-2 text-left
+      text-3xs font-semibold uppercase tracking-[0.1em] text-ink-faint;
+  }
+  .tbl tbody td {
+    @apply border-b border-hairline/60 px-3 py-2;
+  }
+  .tbl tbody tr:hover {
+    @apply bg-elevated/60;
+  }
+
+  .link {
+    @apply text-accent underline-offset-2 hover:underline;
+  }
+  .divider {
+    @apply border-t border-hairline;
+  }
+}
