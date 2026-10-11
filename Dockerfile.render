@@ -3,7 +3,8 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    TZ=Asia/Kolkata
+    TZ=Asia/Kolkata \
+    PORT=8000
 
 WORKDIR /app
 
@@ -24,13 +25,12 @@ RUN python -m pip install --upgrade pip setuptools wheel && \
 # Kotak SDK is optional in CI/Render; do not crash build if package is unavailable
 RUN python -m pip install "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" || echo "Kotak SDK install skipped (optional)"
 
-# Copy app code
+# Copy app code — keep repo layout (/app/backend/...) so `backend.main:app` imports work
 COPY backend/ /app/backend/
-WORKDIR /app/backend
 
 # Non-root user
 RUN useradd --create-home --uid 1001 quantdesk && \
-    mkdir -p /app/backend/var && \
+    mkdir -p /app/var && \
     chown -R quantdesk:quantdesk /app
 
 USER quantdesk
@@ -38,6 +38,8 @@ USER quantdesk
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:8000/api/health || exit 1
+  CMD sh -c 'curl -fsS http://127.0.0.1:${PORT:-8000}/api/v1/system/health || exit 1'
 
-CMD ["gunicorn", "app.main:app", "--workers", "2", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--timeout", "120"]
+# NOTE: shell form so ${PORT} expands at runtime (Render injects $PORT).
+# App lives at backend/main.py -> backend.main:app (there is no `app` package).
+CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips=*

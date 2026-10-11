@@ -1,10 +1,10 @@
 services:
   # Docker backend: https://render.com/docs/docker
-  # Uses Dockerfile.backend (now respects $PORT). Same image as compose.
+  # Uses Dockerfile.render (uvicorn backend.main:app, respects $PORT).
   - type: web
     name: alphatrade-api
     runtime: docker
-    dockerfilePath: ./Dockerfile.backend
+    dockerfilePath: ./Dockerfile.render
     dockerContext: .
     plan: starter # free sleeps -> kills keepalive/feed; starter keeps it alive
     autoDeploy: true
