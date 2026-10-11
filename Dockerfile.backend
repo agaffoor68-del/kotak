@@ -10,11 +10,14 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # The Kotak SDK plus the application requirements.
+# --no-deps: the SDK pins ancient exact versions (numpy==2.1.0, pandas==2.2.3,
+# PyJWT==2.6.0, websockets==8.1, asyncio==3.4.3) that conflict with our ranges.
 COPY backend/requirements.txt ./backend-requirements.txt
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends build-essential curl \
+  && apt-get install -y --no-install-recommends build-essential curl git \
   && pip install -r backend-requirements.txt \
-  && pip install "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" \
+  && pip install --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" \
+  && pip install "websocket-client>=1.8,<2" "websockets>=8.1,<16" six python-dateutil \
   && apt-get purge -y build-essential \
   && apt-get autoremove -y \
   && rm -rf /var/lib/apt/lists/*

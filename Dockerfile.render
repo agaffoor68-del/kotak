@@ -22,8 +22,13 @@ COPY backend/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --upgrade pip setuptools wheel && \
     python -m pip install -r /tmp/requirements.txt
 
-# Kotak SDK is optional in CI/Render; do not crash build if package is unavailable
-RUN python -m pip install "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" || echo "Kotak SDK install skipped (optional)"
+# Kotak SDK is optional in CI/Render; do not crash build if package is unavailable.
+# --no-deps: the SDK pins ancient exact versions (numpy==2.1.0, pandas==2.2.3,
+# PyJWT==2.6.0, websockets==8.1, asyncio==3.4.3) that conflict with our ranges.
+# Its real runtime needs (requests, websocket-client, six, ...) are already
+# covered by requirements.txt or install explicitly below.
+RUN python -m pip install --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" || echo "Kotak SDK install skipped (optional)"
+RUN python -m pip install "websocket-client>=1.8,<2" "websockets>=8.1,<16" six python-dateutil || true
 
 # Copy app code — keep repo layout (/app/backend/...) so `backend.main:app` imports work
 COPY backend/ /app/backend/
