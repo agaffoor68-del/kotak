@@ -1,0 +1,70 @@
+services:
+  # Docker backend: https://render.com/docs/docker
+  # Uses Dockerfile.backend (now respects $PORT). Same image as compose.
+  - type: web
+    name: alphatrade-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    plan: starter # free sleeps -> kills keepalive/feed; starter keeps it alive
+    autoDeploy: true
+    healthCheckPath: /api/v1/system/health
+    disk:
+      name: market-data
+      mountPath: /app/var
+      sizeGB: 1
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: 0
+      - key: TZ
+        value: Asia/Kolkata
+      - key: DATA_DIR
+        value: /app/var
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_TTL_MINUTES
+        value: 720
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: KOTAK_CONSUMER_KEY
+        sync: false
+      - key: KOTAK_TOTP_KEY
+        sync: false
+      - key: KOTAK_MOBILE_NUMBER
+        sync: false
+      - key: KOTAK_MPIN
+        sync: false
+      - key: KOTAK_UCC
+        sync: false
+      - key: KOTAK_ENVIRONMENT
+        value: prod
+      - key: KOTAK_KEEPALIVE
+        value: 1
+      - key: KOTAK_KEEPALIVE_SECONDS
+        value: 300
+      - key: FEED_POLL_SECONDS
+        value: 1
+      - key: RECORD_TICKS
+        value: 1
+      - key: ALLOWED_ORIGINS
+        sync: false # e.g. https://your-frontend.vercel.app
+      - key: FRONTEND_URL
+        sync: false
+      - key: PUBLIC_URL
+        sync: false # e.g. https://alphatrade-api.onrender.com
+      - key: ENABLE_LIVE_TRADING
+        value: 0
+      - key: ENABLE_PAPER_TRADING
+        value: 1
+      - key: ENABLE_BACKTEST
+        value: 1
+      - key: ENABLE_ALGO_EXECUTION
+        value: 0
