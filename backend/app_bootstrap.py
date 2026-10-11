@@ -138,11 +138,10 @@ def startup() -> None:
     from backend.core.config import settings
     from backend.core.database import initialise
 
-    initialise()
-    seed_users()
-    seed_risk_defaults()
-    seed_strategy_templates()
-
+    # Validate secrets FIRST, before touching the disk: on Render a missing
+    # SECRET_KEY / CREDENTIAL_ENCRYPTION_KEY / JWT_SECRET is the #1 boot
+    # failure, and it must say so instead of dying later in seed_users with
+    # an unrelated sqlite traceback.
     missing = [
         name
         for name, value in (
@@ -154,8 +153,22 @@ def startup() -> None:
     ]
     if missing:
         raise RuntimeError(
-            "Missing required configuration: " + ", ".join(missing) + ". Generate with secrets.token_urlsafe(48)."
+            "Missing required configuration: " + ", ".join(missing) + ". "
+            "Set them in the Render dashboard under Environment, then redeploy. "
+            "Generate values with: python -c \"import secrets;print(secrets.token_urlsafe(48))\""
         )
+
+    try:
+        initialise()
+    except Exception as error:
+        raise RuntimeError(
+            f"Could not initialise the database in DATA_DIR={settings.data_dir!r}: {error}. "
+            "On Render this means the disk is not mounted there or DATA_DIR is wrong "
+            "(must match the disk mount path, e.g. /app/var)."
+        ) from error
+    seed_users()
+    seed_risk_defaults()
+    seed_strategy_templates()
 
     os.makedirs(settings.data_dir, exist_ok=True)
     log.info("AlphaTradePro backend ready (env=%s)", settings.environment)

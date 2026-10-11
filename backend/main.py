@@ -44,18 +44,36 @@ and the API says so explicitly when there is no data, rather than inventing any.
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app_bootstrap.startup()
+    try:
+        app_bootstrap.startup()
+    except Exception:
+        # Uvicorn prints "Application startup failed. Exiting." with no cause
+        # unless we log the traceback here. Log it, then re-raise so the
+        # process still exits non-zero and Render reports the deploy as failed.
+        log.exception("Startup failed — refusing to serve with bad configuration")
+        raise
     log.info("Environment: %s", settings.environment)
 
     # Background services. The keepalive keeps Neo logged in; the feed keeps the
     # tape recording so charts and backtests have real history.
-    session_manager.start_keepalive(_credential_resolver)
-    market_feed.start()
+    # Neither may kill the boot: without credentials they log and idle, and
+    # Render's health check must still pass so the cause is visible in logs.
+    try:
+        session_manager.start_keepalive(_credential_resolver)
+    except Exception:  # noqa: BLE001
+        log.exception("Keepalive failed to start; continuing without it")
+    try:
+        market_feed.start()
+    except Exception:  # noqa: BLE001
+        log.exception("Market feed failed to start; continuing without it")
 
     yield
 
     log.info("Shutting down AlphaTradePro")
-    market_feed.stop()
+    try:
+        market_feed.stop()
+    except Exception:  # noqa: BLE001
+        log.exception("Error stopping market feed")
 
 
 def _credential_resolver() -> dict[str, Any]:
