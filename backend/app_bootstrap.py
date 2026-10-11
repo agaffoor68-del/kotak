@@ -52,20 +52,43 @@ def seed_users() -> None:
         return
 
     with app_cursor() as cursor:
-        cursor.execute(
-            "INSERT INTO users (id, email, password_hash, role, is_active, created_at) VALUES (?,?,?,?,1,?)",
-            (uuid.uuid4().hex, settings.bootstrap_admin_email.lower(),
-             hash_password(settings.bootstrap_admin_password), "admin", now()),
+        _ensure_user(
+            cursor,
+            email=settings.bootstrap_admin_email.lower(),
+            password=settings.bootstrap_admin_password,
+            role="admin",
         )
-        log.info("Created bootstrap admin %s", settings.bootstrap_admin_email)
+        log.info("Ensured bootstrap admin %s", settings.bootstrap_admin_email)
 
         if settings.bootstrap_viewer_email and settings.bootstrap_viewer_password:
-            cursor.execute(
-                "INSERT INTO users (id, email, password_hash, role, is_active, created_at) VALUES (?,?,?,?,1,?)",
-                (uuid.uuid4().hex, settings.bootstrap_viewer_email.lower(),
-                 hash_password(settings.bootstrap_viewer_password), "viewer", now()),
+            _ensure_user(
+                cursor,
+                email=settings.bootstrap_viewer_email.lower(),
+                password=settings.bootstrap_viewer_password,
+                role="viewer",
             )
-            log.info("Created bootstrap viewer %s", settings.bootstrap_viewer_email)
+            log.info("Ensured bootstrap viewer %s", settings.bootstrap_viewer_email)
+
+
+def _ensure_user(cursor, *, email: str, password: str, role: str) -> None:
+    """Insert-or-noop per email, so reordered/retried boots never violate
+    the UNIQUE constraint on users.email.
+
+    The old code did one COUNT(*) check for the whole table, then inserted
+    admin + viewer in a single transaction: if the admin insert committed on
+    a previous crashed boot (or admin email == viewer email), the second
+    INSERT raised sqlite3.IntegrityError and killed the boot loop forever.
+    """
+    from backend.core.database import now
+    from backend.core.security import hash_password
+
+    cursor.execute("SELECT 1 FROM users WHERE email = ?", (email,))
+    if cursor.fetchone():
+        return
+    cursor.execute(
+        "INSERT INTO users (id, email, password_hash, role, is_active, created_at) VALUES (?,?,?,?,1,?)",
+        (uuid.uuid4().hex, email, hash_password(password), role, now()),
+    )
 
 
 def seed_risk_defaults() -> None:
