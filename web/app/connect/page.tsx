@@ -49,6 +49,57 @@ function verdictChip(verdict: BrokerNetworkResponse["verdict"]) {
   }
 }
 
+function FyersSetupPanel() {
+  const [accepted, setAccepted] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+
+  return (
+    <Panel
+      title="Connect FYERS terminal"
+      subtitle="Use the App ID, App Secret and access token from your FYERS API app"
+      actions={<StatusChip status="warn" label="Setup required" />}
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="App ID" hint="FYERS API app ID">
+          <input className="field-input font-mono" autoComplete="off" spellCheck={false} placeholder="e.g. ABCD1234-100" />
+        </Field>
+        <Field label="App Secret" hint="Keep this private">
+          <input className="field-input font-mono" type="password" autoComplete="off" spellCheck={false} placeholder="Paste your app secret" />
+        </Field>
+        <Field label="Access token" hint="Generated after the FYERS OAuth login">
+          <div className="flex gap-2">
+            <input className="field-input min-w-0 flex-1 font-mono" type={showSecret ? "text" : "password"} autoComplete="off" spellCheck={false} placeholder="Paste access token" />
+            <button className="btn btn-sm btn-ghost" type="button" onClick={() => setShowSecret((value) => !value)}>
+              {showSecret ? "Hide" : "Show"}
+            </button>
+          </div>
+        </Field>
+        <Field label="Redirect URL" hint="Register this exact URL in FYERS">
+          <input className="field-input font-mono" defaultValue="https://alpha-trade-pro.vercel.app/api/v1/broker/fyers/callback" readOnly />
+        </Field>
+      </div>
+
+      <div className="mt-4 rounded-md border border-accent/30 bg-accent-soft px-3 py-3 text-2xs text-ink-dim">
+        <p className="font-semibold text-ink">Required FYERS API permissions</p>
+        <p className="mt-1">Profile details, transaction info, historical data, quotes and market data, and order placements.</p>
+      </div>
+      <label className="mt-4 flex cursor-pointer items-start gap-2 text-2xs text-ink-dim">
+        <input className="mt-0.5 size-4 accent-[var(--accent)]" type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} />
+        <span>I accept the FYERS API terms and conditions.</span>
+      </label>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button className="btn btn-primary" type="button" disabled={!accepted}>
+          Save and activate FYERS
+        </button>
+        <span className="text-3xs text-ink-faint">Credentials will be encrypted and never shown again.</span>
+      </div>
+      <p className="mt-3 rounded border border-hairline px-3 py-2 text-3xs leading-relaxed text-ink-faint">
+        Real-time quotes require the FYERS WebSocket session after activation. This form is ready for the production credentials; no demo market data is displayed.
+      </p>
+    </Panel>
+  );
+}
+
 function ConnectPanel({ onConnected }: { onConnected: () => void }) {
   const [form, setForm] = useState<Form>(EMPTY_FORM);
   const [result, setResult] = useState<BrokerTestResult | null>(null);
@@ -436,13 +487,15 @@ function Connect() {
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Broker connection</h1>
         <p className="text-2xs text-ink-faint">
-          Connect your own Kotak Neo account and verify the network path to the API
+          Connect both Kotak Neo and FYERS terminals for one professional live trading desk
         </p>
       </header>
 
       {error ? <ErrorNote error={error} onRetry={() => void load()} /> : null}
 
       <AccountsPanel data={accounts} onChanged={() => void load()} />
+
+      <FyersSetupPanel />
 
       {canConnect ? (
         <ConnectPanel onConnected={() => void load()} />
