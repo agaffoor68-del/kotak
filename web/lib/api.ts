@@ -5,7 +5,10 @@
  * signed in without ever writing credentials to disk.
  */
 
-const DEFAULT_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000";
+// Render hosts the production API separately from the Vercel frontend. The
+// environment variable still wins, while this public fallback prevents a
+// deployed build from trying to call a user's localhost.
+const DEFAULT_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "https://alpha-4tik.onrender.com";
 let base = DEFAULT_BASE;
 let accessToken: string | null = null;
 
