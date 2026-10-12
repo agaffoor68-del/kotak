@@ -4,9 +4,9 @@ import { AuthProvider } from "@/lib/auth";
 import { ServiceWorker } from "@/components/service-worker";
 
 export const metadata: Metadata = {
-  title: "AlphaTradePro — Kotak Neo trading platform",
+  title: "AlphaTradePro — Angel One data, dual-broker execution",
   description:
-    "Institutional algorithmic trading for Indian markets on Kotak Neo. Live data, real orders, option chain analytics, backtesting and risk controls.",
+    "Institutional algorithmic trading for Indian markets. Market data from Angel One SmartAPI; live orders routed to Kotak Neo, Angel One, or both.",
   applicationName: "AlphaTradePro",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "AlphaTradePro", statusBarStyle: "black-translucent" },

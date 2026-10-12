@@ -8,9 +8,11 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from backend.api.deps import CurrentUser, broker_call, current_user, require_trader, resolve_account_id, session_health
+from backend.api.deps import CurrentUser, angel_session_health, current_user, require_trader, resolve_account_id, session_health
 from backend.core.database import app_cursor, now
 from backend.execution import algo, live
+from backend.execution import brokers as broker_registry
+from backend.execution import order_service
 from backend.execution.charges import DEFAULT_PLANS, round_trip_cost
 from backend.marketdata.market_hours import is_market_open
 from backend.papertrading import engine as paper
@@ -32,6 +34,9 @@ class OrderModel(BaseModel):
     instrument_token: str | None = None
     disclosed_quantity: str = "0"
     amo: str = "NO"
+    #: Which broker receives this order: ``kotak``, ``angel`` or ``both``.
+    #: Omitted -> the deployment default (``DEFAULT_EXECUTION_BROKER``).
+    broker: str | None = None
     confirmation: str = ""
     equity: float | None = None
 
@@ -44,11 +49,13 @@ class ModifyModel(BaseModel):
     validity: str = "DAY"
     trigger_price: str = "0"
     disclosed_quantity: str = "0"
+    broker: str | None = None
     confirmation: str = ""
 
 
 class CancelModel(BaseModel):
     order_id: str
+    broker: str | None = None
     confirmation: str = ""
 
 
@@ -76,11 +83,34 @@ class JournalModel(BaseModel):
 
 
 @router.get("/portfolio")
-def portfolio(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
-    """Live holdings, positions, limits and books from Kotak Neo."""
+def portfolio(
+    broker: str | None = Query(default=None, description="kotak, angel or both"),
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Live holdings, positions, limits and books from the selected broker."""
     account_id = resolve_account_id(user)
     try:
-        return {**live.portfolio(account_id), "session": session_health(account_id)}
+        if str(broker or "").lower() == "both":
+            books = {
+                name: order_service.portfolio(account_id, name)
+                for name, _ in broker_registry.targets_for(account_id, "both")
+            }
+            return {
+                "broker": "both", "as_of": now(), "books": books,
+                "sessions": {
+                    "kotak": session_health(account_id),
+                    "angel": angel_session_health(),
+                },
+            }
+        result = order_service.portfolio(account_id, broker)
+        return {
+            **result,
+            "session": (
+                angel_session_health(result["account_id"])
+                if result["broker"] == "angel"
+                else session_health(result["account_id"])
+            ),
+        }
     except live.OrderRejected as error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, error.message) from error
 
@@ -89,6 +119,7 @@ def portfolio(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
 def list_orders(
     limit: int = Query(default=100, ge=1, le=1000),
     mode: str | None = None,
+    broker: str | None = None,
     user: CurrentUser = Depends(current_user),
 ) -> list[dict[str, Any]]:
     account_id = resolve_account_id(user)
@@ -97,6 +128,9 @@ def list_orders(
     if mode:
         sql += " AND mode = ?"
         params.append(mode)
+    if broker:
+        sql += " AND broker = ?"
+        params.append(str(broker).lower())
     sql += " ORDER BY created_at DESC LIMIT ?"
     params.append(limit)
     with app_cursor() as cursor:
@@ -105,11 +139,15 @@ def list_orders(
 
 
 @router.get("/margin")
-def margin(payload: dict[str, Any] = Body(...), user: CurrentUser = Depends(current_user)) -> Any:
-    """Margin Kotak requires for an order, before placing it."""
+def margin(
+    payload: dict[str, Any] = Body(...),
+    broker: str | None = Query(default=None),
+    user: CurrentUser = Depends(current_user),
+) -> Any:
+    """Margin required for an order, before placing it."""
     account_id = resolve_account_id(user)
     try:
-        return live.margin_required(payload, account_id)
+        return order_service.margin_required(payload, account_id, broker)
     except live.OrderRejected as error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, error.message) from error
 
@@ -150,15 +188,18 @@ def charges_preview(
 
 @router.post("/orders/live", status_code=status.HTTP_201_CREATED)
 def place_live_order(payload: OrderModel, user: CurrentUser = Depends(require_trader)) -> dict[str, Any]:
-    """Place a real order with Kotak Neo.
+    """Place a real order with Kotak Neo, Angel One, or both.
 
     Requires the typed confirmation phrase, the live-trading feature gate, and a
-    passing risk check.
+    passing risk check. `broker` selects the destination; `both` fans the same
+    signal out to every enabled broker.
     """
     account_id = resolve_account_id(user)
+    order = payload.model_dump()
+    broker = order.pop("broker", None)
     try:
-        return live.place_order(
-            payload.model_dump(), account_id=account_id, confirmation=payload.confirmation,
+        return order_service.place(
+            order, account_id=account_id, broker=broker, confirmation=payload.confirmation,
             equity=payload.equity, is_market_open=is_market_open(),
         )
     except live.OrderRejected as error:
@@ -174,11 +215,11 @@ def place_live_order(payload: OrderModel, user: CurrentUser = Depends(require_tr
 def modify_order(payload: ModifyModel, user: CurrentUser = Depends(require_trader)) -> dict[str, Any]:
     account_id = resolve_account_id(user)
     try:
-        return live.modify_order(
-            account_id=account_id, order_id=payload.order_id, price=payload.price,
-            quantity=payload.quantity, order_type=payload.order_type, validity=payload.validity,
+        return order_service.modify(
+            account_id=account_id, order_id=payload.order_id, broker=payload.broker,
+            confirmation=payload.confirmation, price=payload.price, quantity=payload.quantity,
+            order_type=payload.order_type, validity=payload.validity,
             trigger_price=payload.trigger_price, disclosed_quantity=payload.disclosed_quantity,
-            confirmation=payload.confirmation,
         )
     except live.OrderRejected as error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, error.message) from error
@@ -188,18 +229,33 @@ def modify_order(payload: ModifyModel, user: CurrentUser = Depends(require_trade
 def cancel_order(payload: CancelModel, user: CurrentUser = Depends(require_trader)) -> dict[str, Any]:
     account_id = resolve_account_id(user)
     try:
-        return live.cancel_order(
-            account_id=account_id, order_id=payload.order_id, confirmation=payload.confirmation
+        return order_service.cancel(
+            account_id=account_id, order_id=payload.order_id, broker=payload.broker,
+            confirmation=payload.confirmation,
         )
     except live.OrderRejected as error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, error.message) from error
 
 
+@router.get("/execution/brokers")
+def execution_brokers() -> dict[str, Any]:
+    """Which brokers this deployment will route orders to, and the default."""
+    return {
+        "enabled": broker_registry.enabled_brokers(),
+        "default": broker_registry.settings.default_execution_broker,
+        "available": ["kotak", "angel", "both"],
+        "data_source": "angel_one",
+    }
+
+
 @router.post("/session/reconnect")
-def reconnect(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
-    """Force a fresh Kotak Neo login."""
+def reconnect(
+    broker: str | None = Query(default=None, description="kotak or angel"),
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Force a fresh login on the selected broker."""
     account_id = resolve_account_id(user)
-    return live.reconnect(account_id)
+    return order_service.reconnect(account_id, broker)
 
 
 # --------------------------------------------------------------- paper trading
@@ -298,6 +354,7 @@ def list_runs(user: CurrentUser = Depends(current_user)) -> list[dict[str, Any]]
 
 @router.post("/algo/runs", status_code=status.HTTP_201_CREATED)
 def start_run(strategy_id: str, mode: str = Query(default="paper", pattern="^(paper|live)$"),
+               broker: str | None = Query(default=None, description="kotak, angel or both"),
                user: CurrentUser = Depends(require_trader)) -> dict[str, Any]:
     """Deploy a strategy to trade paper or live."""
     account_id = resolve_account_id(user)
@@ -310,7 +367,7 @@ def start_run(strategy_id: str, mode: str = Query(default="paper", pattern="^(pa
 
     strategy = {"id": strategy_id, "name": row["name"], "definition": json.loads(row["definition"])}
     try:
-        run = algo.supervisor.start(strategy, account_id, mode)
+        run = algo.supervisor.start(strategy, account_id, mode, broker=broker)
     except ValueError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
     return run.to_dict()

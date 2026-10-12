@@ -54,7 +54,7 @@ function OptionDesk() {
         <div>
           <h1 className="text-lg font-semibold tracking-tight">Option chain</h1>
           <p className="text-2xs text-ink-faint">
-            {underlying} · live open interest and prices from Kotak Neo · Greeks from Black-Scholes
+            {underlying} · live open interest and prices from Angel One SmartAPI · Greeks from Black-Scholes
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -202,8 +202,8 @@ function OptionDesk() {
           <Panel title="How these numbers are produced">
             <ul className="space-y-1.5 text-2xs leading-relaxed text-ink-faint">
               <li>
-                <span className="text-ink-dim">OI, volume, IV and prices</span> are live values from the Kotak
-                Neo quote API for each contract.
+                <span className="text-ink-dim">OI, volume, IV and prices</span> are live values from the Angel
+                One SmartAPI quote API for each contract.
               </li>
               <li>
                 <span className="text-ink-dim">Greeks</span> use Black-Scholes with the live underlying index as

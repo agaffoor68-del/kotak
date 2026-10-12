@@ -101,15 +101,20 @@ def lookup(token, segment):
 contracts = {
     "expiries": ["2030-01-31"],
     "rows": {
-        90.0: {"strike": 90.0, "expiry": "2030-01-31", "exchange_segment": "nse_fo",
-               "call": {"token": "1C", "trading_symbol": "X90CE"}, "put": {"token": "1P", "trading_symbol": "X90PE"}},
-        100.0: {"strike": 100.0, "expiry": "2030-01-31", "exchange_segment": "nse_fo",
-                "call": {"token": "2C", "trading_symbol": "X100CE"}, "put": {"token": "2P", "trading_symbol": "X100PE"}},
-        110.0: {"strike": 110.0, "expiry": "2030-01-31", "exchange_segment": "nse_fo",
-                "call": {"token": "3C", "trading_symbol": "X110CE"}, "put": {"token": "3P", "trading_symbol": "X110PE"}},
+        "2030-01-31": {
+            90.0: {"strike": 90.0, "expiry": "2030-01-31", "exchange_segment": "nse_fo",
+                   "call": {"token": "1C", "trading_symbol": "X90CE"}, "put": {"token": "1P", "trading_symbol": "X90PE"}},
+            100.0: {"strike": 100.0, "expiry": "2030-01-31", "exchange_segment": "nse_fo",
+                    "call": {"token": "2C", "trading_symbol": "X100CE"}, "put": {"token": "2P", "trading_symbol": "X100PE"}},
+            110.0: {"strike": 110.0, "expiry": "2030-01-31", "exchange_segment": "nse_fo",
+                    "call": {"token": "3C", "trading_symbol": "X110CE"}, "put": {"token": "3P", "trading_symbol": "X110PE"}},
+        }
     },
 }
-chain = build_chain(contracts, spot=100.0, quote_lookup=lookup, now_ts=1_700_000_000)
+# The near expiry is derived from `expiries` against the current date, so the
+# fixture's expiry must sit in the future relative to the evaluation time.
+now_ts = 1_893_456_000.0  # 2030-01-01 UTC
+chain = build_chain(contracts, spot=100.0, quote_lookup=lookup, now_ts=now_ts)
 print("Chain assembly")
 check("Chain reports data available", chain["has_data"])
 check("Chain has 3 strikes", len(chain["rows"]) == 3)
@@ -122,6 +127,6 @@ check("Support/resistance identified", len(chain["summary"]["support"]) > 0)
 check("Bias reads as put writing", chain["summary"]["oi_change_bias"] == "put writing")
 
 empty = build_chain({"expiries": [], "rows": {}}, spot=None, quote_lookup=lambda *_: None, now_ts=0)
-check("Empty chain reports no data honestly", empty["has_data"] is False and "sync" in empty["note"])
+check("Empty chain reports no data honestly", empty["has_data"] is False and "sync" in empty["note"].lower())
 
 print(f"\nAll {CHECKS} option chain checks passed.")

@@ -48,7 +48,7 @@ function MarketWatch() {
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Start with the major indices, which always have a known Kotak token.
+  // Start with the major indices, which always have a known instrument token.
   useEffect(() => {
     const seeds: Instrument[] = [
       { token: "26000", exchange_segment: "nse_cm", symbol: "NIFTY", trading_symbol: "NIFTY", name: "NIFTY 50", is_index: 1 },
@@ -164,7 +164,7 @@ function MarketWatch() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold tracking-tight">Market watch</h1>
-          <p className="text-2xs text-ink-faint">Live Kotak Neo quotes over WebSocket · candles from the recorded tape</p>
+          <p className="text-2xs text-ink-faint">Live Angel One SmartAPI quotes · historical candles from SmartAPI</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select className="field-select w-auto" value={interval} onChange={(event) => setInterval(event.target.value)}>
@@ -296,7 +296,7 @@ function MarketWatch() {
                 title="No recorded candles for this instrument"
                 message={
                   coverage?.note ??
-                  "Kotak Neo publishes no historical candles. This platform records the live tape, so history builds from the moment the feed starts recording this instrument."
+                  "Candles come from Angel One SmartAPI. Kotak Neo publishes no historical candles, which is why the platform reads its market data from Angel."
                 }
               />
             )}

@@ -1,8 +1,10 @@
 """AlphaTradePro FastAPI application.
 
-All market data and all execution flow through Kotak Neo. Nothing in this
-service invents prices: when the broker is unreachable the API returns an error
-the UI can show, not a placeholder.
+Market data is served by **Angel One SmartAPI** (instrument master, quotes and
+historical candles). Order execution is dual-broker: a signal can go to **Kotak
+Neo**, to **Angel One**, or to both. Nothing in this service invents prices:
+when a broker is unreachable the API returns an error the UI can show, not a
+placeholder.
 """
 
 from __future__ import annotations
@@ -17,28 +19,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend import app_bootstrap
+from backend.angel.auth import angel_session_manager
+from backend.angel.feed import angel_feed
 from backend.api.routes import analytics, auth, broker, execution, market, options, share, strategies
 from backend.api.ws import router as ws_router
+from backend.broker import accounts
 from backend.broker.neo_auth import session_manager
 from backend.core.config import settings
 from backend.marketdata import master
-from backend.marketdata.feed import market_feed
 
 log = logging.getLogger("alphatrade")
 
 DESCRIPTION = """
-Institutional trading platform for the Indian markets, connected exclusively to
-**Kotak Neo**.
+Institutional trading platform for the Indian markets.
 
-* Live market data over the Kotak Neo REST quote API and WebSocket feed
-* Real order routing, modify and cancel through the Kotak Neo trade API
+* Market data from **Angel One SmartAPI** — instrument master, live quotes and
+  historical candles (1m to 1d)
+* Dual-broker execution: orders route to **Kotak Neo**, **Angel One**, or both
 * Option chain analytics with Black-Scholes Greeks, PCR and max pain
 * A no-code strategy builder, backtester and algo execution engine
 * Paper trading, a risk engine with a kill switch, and an AI trading coach
 
-**Data note.** Kotak Neo publishes no historical candles. This platform records the
-live tape itself, so backtests and charts cover the period it has been running —
-and the API says so explicitly when there is no data, rather than inventing any.
+**Data note.** Kotak Neo publishes no historical candles, which is exactly why
+this platform reads its market data from Angel One. Every figure is real; when a
+broker is unreachable the API says so rather than inventing one.
 """.strip()
 
 
@@ -54,36 +58,61 @@ async def lifespan(app: FastAPI):
         raise
     log.info("Environment: %s", settings.environment)
 
-    # Background services. The keepalive keeps Neo logged in; the feed keeps the
-    # tape recording so charts and backtests have real history.
+    # Background services. The Kotak keepalive keeps Neo logged in for order
+    # execution; the Angel keepalive keeps the market-data session fresh; the
+    # Angel feed records the tape and fans quotes out to the dashboard.
     # Neither may kill the boot: without credentials they log and idle, and
     # Render's health check must still pass so the cause is visible in logs.
     try:
         session_manager.start_keepalive(_credential_resolver)
     except Exception:  # noqa: BLE001
-        log.exception("Keepalive failed to start; continuing without it")
+        log.exception("Kotak keepalive failed to start; continuing without it")
     try:
-        market_feed.start()
+        angel_session_manager.start_keepalive(_angel_credential_resolver)
     except Exception:  # noqa: BLE001
-        log.exception("Market feed failed to start; continuing without it")
+        log.exception("Angel keepalive failed to start; continuing without it")
+    try:
+        angel_feed.start(_angel_feed_resolver)
+    except Exception:  # noqa: BLE001
+        log.exception("Angel market feed failed to start; continuing without it")
 
     yield
 
     log.info("Shutting down AlphaTradePro")
     try:
-        market_feed.stop()
+        angel_feed.stop()
     except Exception:  # noqa: BLE001
-        log.exception("Error stopping market feed")
+        log.exception("Error stopping the Angel market feed")
 
 
 def _credential_resolver() -> dict[str, Any]:
-    from backend.broker import accounts
-
     try:
-        return accounts.resolve_all()
+        return accounts.resolve_kotak()
     except Exception as error:  # noqa: BLE001
-        log.warning("Could not resolve broker credentials: %s", error)
+        log.warning("Could not resolve Kotak credentials: %s", error)
         return {}
+
+
+def _angel_credential_resolver() -> dict[str, Any]:
+    try:
+        return accounts.resolve_angel()
+    except Exception as error:  # noqa: BLE001
+        log.warning("Could not resolve Angel credentials: %s", error)
+        return {}
+
+
+def _angel_feed_resolver():
+    """The (account_id, smartapi bridge) pair the market-data feed polls with."""
+    from backend.api.deps import angel_call, resolve_angel_account_id
+
+    account_id = resolve_angel_account_id()
+    if not account_id:
+        return None, None
+    try:
+        return account_id, angel_call(account_id=account_id)
+    except Exception as error:  # noqa: BLE001
+        log.warning("Angel feed could not build a session bridge: %s", error)
+        return account_id, None
 
 
 app = FastAPI(
@@ -146,10 +175,14 @@ app.include_router(ws_router)
 
 @app.get("/", tags=["meta"])
 def root() -> dict[str, Any]:
+    from backend.execution import brokers as broker_registry
+
     return {
         "service": "AlphaTradePro",
         "version": "1.0.0",
-        "broker": "Kotak Neo (exclusive)",
+        "data_source": "angel_one",
+        "execution_brokers": broker_registry.enabled_brokers(),
+        "default_execution_broker": settings.default_execution_broker,
         "docs": "/docs",
         "health": "/api/v1/system/health",
         "share": "/api/v1/share",
@@ -163,20 +196,28 @@ def health() -> dict[str, Any]:
     """Liveness and dependency health.
 
     Reports the real state of each dependency, so a monitor can distinguish
-    "process up" from "broker connected".
+    "process up" from "Angel data session live" and "Kotak order session live".
     """
+    from backend.angel import instruments as angel_instruments
+    from backend.api.deps import angel_session_health
+    from backend.execution import brokers as broker_registry
     from backend.marketdata.quotes import quote_engine
 
     return {
         "status": "ok",
         "time": time.time(),
         "environment": settings.environment,
-        "broker": "kotak_neo",
-        "feed": market_feed.health(),
+        "data_source": "angel_one",
+        "execution_brokers": broker_registry.enabled_brokers(),
+        "feed": angel_feed.health(),
         "scrip_master": master.status(),
+        "angel_instruments": angel_instruments.status(),
         "quotes": quote_engine.health(),
+        "angel_session": angel_session_health(),
         "sessions": {
             "registry": "ready",
+            "kotak": "configured" if accounts.list_accounts("kotak") else "unconfigured",
+            "angel": "configured" if accounts.list_accounts("angel") else "unconfigured",
         },
         "features": {
             "live_trading": settings.enable_live_trading,

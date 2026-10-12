@@ -25,3 +25,7 @@ reportlab>=4,<5
 qrcode>=7.4,<9
 ably>=2.0.0,<4
 structlog>=24,<26
+# Angel One SmartAPI order/quote calls. The candle and instrument-master
+# endpoints are called over plain HTTP (requests), so this SDK is only needed
+# for the order surface and the smart-api WebSocket feed when enabled.
+smartapi-python-client>=1.0,<2

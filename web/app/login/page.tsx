@@ -23,17 +23,17 @@ export default function LoginPage() {
           <h1 className="text-3xl font-semibold leading-tight">
             Institutional trading,
             <br />
-            wired to Kotak Neo.
+            Angel One data, dual-broker execution.
           </h1>
           <p className="text-sm leading-relaxed text-ink-dim">
-            Live ticks over the Neo WebSocket, real orders through the Neo trade API, and an option chain
-            with live open interest and Greeks.
+            Live quotes and historical candles from Angel One SmartAPI, real orders through Kotak Neo
+            or Angel One, and an option chain with live open interest and Greeks.
           </p>
           <ul className="space-y-2 text-xs text-ink-faint">
             {[
-              "No simulated prices — every figure comes from Kotak Neo",
+              "No simulated prices — every figure comes from Angel One SmartAPI",
+              "Orders route to Kotak Neo, Angel One, or both at once",
               "Risk engine and emergency kill switch gate every order",
-              "Record the tape as it trades, so charts and backtests use real data",
             ].map((line) => (
               <li key={line} className="flex items-start gap-2">
                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-accent" />

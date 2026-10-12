@@ -66,6 +66,42 @@ class Settings:
         self.keepalive_enabled = _flag("KOTAK_KEEPALIVE", True)
         self.login_attempts = _int("KOTAK_LOGIN_ATTEMPTS", 3)
 
+        # --- Angel One SmartAPI (market data + optional execution) --------
+        # The data layer is Angel One, not Kotak: Kotak Neo publishes no
+        # historical candles, so candles and the instrument master come from
+        # SmartAPI. Credentials live in the encrypted store, these are the
+        # non-secret knobs.
+        self.angel_environment = os.getenv("ANGEL_ENVIRONMENT", "prod")
+        self.angel_session_ttl_seconds = _int("ANGEL_SESSION_TTL_SECONDS", 8 * 60 * 60)
+        self.angel_session_file = os.getenv("ANGEL_SESSION_FILE", os.path.join(self.data_dir, "angel_session.json"))
+        self.angel_instrument_file = os.getenv(
+            "ANGEL_INSTRUMENT_FILE", os.path.join(self.data_dir, "angel_instruments.json")
+        )
+        self.angel_sync_url = os.getenv(
+            "ANGEL_SYNC_URL",
+            "https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json",
+        )
+        self.angel_rate_limit_per_second = _int("ANGEL_RATE_LIMIT_PER_SECOND", 3)
+        #: SmartAPI refuses more than a handful of symbols per quote/LTP call.
+        self.angel_max_tokens_per_call = _int("ANGEL_MAX_TOKENS_PER_CALL", 50)
+        #: SmartAPI caps a single historical call; long ranges are chunked.
+        self.angel_history_days_default = _int("ANGEL_HISTORY_DAYS_DEFAULT", 30)
+        self.angel_history_days_max = _int("ANGEL_HISTORY_DAYS_MAX", 1800)
+
+        # --- execution routing -------------------------------------------
+        # Which broker receives an order when the caller does not name one.
+        # "kotak", "angel" or "both" (fan the same signal out to both).
+        self.default_execution_broker = os.getenv("DEFAULT_EXECUTION_BROKER", "kotak").strip().lower()
+        self.execution_brokers = [
+            value.strip().lower()
+            for value in os.getenv("EXECUTION_BROKERS", "kotak,angel").split(",")
+            if value.strip()
+        ]
+        #: When two brokers hold a copy of the same position this is the size
+        #: multiplier applied to the second leg, so a signal is not silently
+        #: doubled in the book (1.0 = every listed broker gets the full size).
+        self.dual_execution_size = _float("DUAL_EXECUTION_SIZE", 1.0)
+
         # --- market data -------------------------------------------------
         self.broker_quote_workers = _int("BROKER_QUOTE_WORKERS", 4)
         self.max_tokens_per_quote_call = _int("MAX_TOKENS_PER_QUOTE_CALL", 100)

@@ -1,10 +1,10 @@
 """Option chain analytics: Greeks, PCR, max pain, and support/resistance.
 
-Greeks are computed with Black-Scholes from parameters Kotak actually provides
-(spot from the live index quote, strike and expiry from the scrip master, and
-IV from the exchange feed). When IV is missing, an ATM-based implied-volatility
-surface is *not* fabricated — the row is returned with `greeks_available: false`
-so the UI can explain why.
+Greeks are computed with Black-Scholes from parameters Angel One actually
+provides (spot from the live index quote, strike and expiry from the instrument
+master, and IV from the exchange quote feed). When IV is missing, an ATM-based
+implied-volatility surface is *not* fabricated — the row is returned with
+`greeks_available: false` so the UI can explain why.
 
 Max pain, PCR and the support/resistance levels are computed from the real
 open-interest distribution of the chain.
@@ -13,6 +13,7 @@ open-interest distribution of the chain.
 from __future__ import annotations
 
 import math
+import time
 from typing import Any
 
 from backend.strategies.indicators import atr_series
@@ -158,26 +159,39 @@ def build_chain(
 ) -> dict[str, Any]:
     """Assemble a full option chain.
 
-    `contracts` is the shape from :func:`backend.marketdata.master.option_contracts`
+    `contracts` is the shape from :func:`backend.marketdata.master.option_contracts`,
+    i.e. ``{expiries: [...], rows: {expiry: {strike: {call: ..., put: ...}}}}``,
     and `quote_lookup(token, segment)` returns a live `Quote` (or `None`).
+
+    The near expiry (the first in an ascending list) is the one charted; a
+    contract whose expiry has already passed is skipped rather than shown as a
+    stale chain.
     """
-    rows_by_strike = contracts.get("rows") or {}
+    by_expiry = contracts.get("rows") or {}
+    # `expiries` is sorted ascending by the master; the near date is the first
+    # one that is today or later, so an expired series never becomes "the chain".
+    expiries = list(contracts.get("expiries") or [])
+    today = time.strftime("%Y-%m-%d", time.gmtime(now_ts))
+    expiry = next((date for date in expiries if date and date >= today), None)
+    if expiry is None:
+        return {
+            "expiries": expiries, "rows": [], "spot": spot,
+            "has_data": False, "greeks_available": False,
+            "note": "Every expiry in the master is in the past. Sync the instrument master.",
+        }
+
+    rows_by_strike = by_expiry.get(expiry) or {}
     strikes = sorted(float(strike) for strike in rows_by_strike)
     if not strikes:
         return {
-            "expiries": contracts.get("expiries", []), "rows": [], "spot": spot,
+            "expiries": expiries, "rows": [], "spot": spot,
             "has_data": False, "greeks_available": False,
-            "note": "No option contracts for this underlying in the scrip master. Run a symbol-master sync.",
+            "note": "No option contracts for this underlying in the instrument master. Run a sync.",
         }
-
-    expiry = rows_by_strike[strikes[0]].get("expiry")
-    if expiry:
-        # Only the strikes belonging to the earliest expiry are the near chain.
-        strikes = [s for s in strikes if rows_by_strike[s].get("expiry") == expiry]
 
     chain_rows: list[dict[str, Any]] = []
     for strike in strikes:
-        entry = rows_by_strike[strike]
+        entry = rows_by_strike[strike] or rows_by_strike[str(strike)] or {}
         call_token = (entry.get("call") or {}).get("token")
         put_token = (entry.get("put") or {}).get("token")
         call_quote = quote_lookup(call_token, entry.get("exchange_segment", "nse_fo")) if call_token else None

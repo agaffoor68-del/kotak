@@ -154,6 +154,26 @@ def seed_strategy_templates() -> None:
             log.debug("Installed strategy template %s", template["name"])
 
 
+def seed_instrument_master() -> None:
+    """Populate the instrument master from Angel One on first boot.
+
+    Market data is Angel's, so the shared `instruments` table starts empty and
+    nothing (search, quotes, candles) works until it is filled. Doing it here
+    means a fresh deploy is usable without a manual sync; failures are logged
+    and never fatal, because a network blip must not stop the API booting.
+    """
+    from backend.angel import instruments as angel_instruments
+    from backend.marketdata import master
+
+    try:
+        if master.status()["instruments"]:
+            return
+        result = angel_instruments.bootstrap_if_empty()
+        log.info("Instrument master bootstrap: %s", result.get("status"))
+    except Exception as error:  # noqa: BLE001 - a data fetch must not break boot
+        log.warning("Could not bootstrap the Angel One instrument master: %s", error)
+
+
 def startup() -> None:
     """Full boot sequence. Safe to call more than once."""
     configure_logging()
@@ -192,6 +212,7 @@ def startup() -> None:
     seed_users()
     seed_risk_defaults()
     seed_strategy_templates()
+    seed_instrument_master()
 
     os.makedirs(settings.data_dir, exist_ok=True)
     log.info("AlphaTradePro backend ready (env=%s)", settings.environment)

@@ -106,7 +106,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return <BootScreen />;
   }
 
-  const brokerLive = status?.broker_session?.authenticated === true;
+  // Market data runs on the Angel One session; the header reconnect targets it.
+  const dataLive = status?.feed?.status === "connected";
 
   const navigation = (
     <nav className="space-y-5">
@@ -172,12 +173,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             ) : null}
             <span className="num hidden text-3xs text-ink-faint lg:inline">{clock(now)} IST</span>
-            {!brokerLive ? (
+            {!dataLive ? (
               <button
                 className="btn btn-sm"
                 type="button"
                 onClick={() => api.reconnect().catch(() => undefined)}
-                title={status?.broker_session?.last_error ?? "Kotak Neo is not authenticated"}
+                title={status?.feed?.last_error ?? "The Angel One data session is not authenticated"}
               >
                 Reconnect broker
               </button>

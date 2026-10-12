@@ -122,6 +122,95 @@ class BrokerCredentials:
         }
 
 
+@dataclass
+class AngelCredentials:
+    """Secrets for one Angel One SmartAPI account.
+
+    Angel's TOTP flow needs the ``api_key`` (SmartAPI key), the ``client_code``
+    (Angel user id), the account PIN and the TOTP seed — the same shape as
+    Kotak's consumer key / UCC / MPIN / TOTP. Kept in its own class so the two
+    brokers never share a credential record and a vault key rotation cannot mix
+    them up.
+    """
+
+    api_key: str
+    client_code: str
+    pin: str
+    totp_key: str
+    environment: str = "prod"
+
+    def __post_init__(self) -> None:
+        missing = [
+            name
+            for name in ("api_key", "client_code", "pin", "totp_key")
+            if not str(getattr(self, name) or "").strip()
+        ]
+        if missing:
+            raise ValueError("Missing Angel One credentials: " + ", ".join(missing))
+
+    def to_ciphertext(self) -> str:
+        import json
+
+        payload = json.dumps(
+            {
+                "broker": "angel",
+                "api_key": self.api_key,
+                "client_code": self.client_code,
+                "pin": self.pin,
+                "totp_key": self.totp_key,
+                "environment": self.environment,
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return _fernet().encrypt(payload).decode("ascii")
+
+    @classmethod
+    def from_ciphertext(cls, token: str) -> "AngelCredentials":
+        import json
+
+        data = json.loads(_fernet().decrypt(token.encode("ascii")))
+        if data.get("broker") not in (None, "angel"):
+            raise ValueError("This credential record does not belong to Angel One")
+        return cls(**{key: data.get(key) for key in ("api_key", "client_code", "pin", "totp_key", "environment")})
+
+    @classmethod
+    def from_environment(cls) -> "AngelCredentials | None":
+        """Fallback for a single-account deployment using plain env vars."""
+        if not settings.legacy_env_fallback:
+            return None
+        values = {
+            "api_key": os.getenv("ANGEL_API_KEY", ""),
+            "client_code": os.getenv("ANGEL_CLIENT_CODE", ""),
+            "pin": os.getenv("ANGEL_PIN", ""),
+            "totp_key": os.getenv("ANGEL_TOTP_KEY", ""),
+        }
+        if not all(values.values()):
+            return None
+        return cls(**values, environment=settings.angel_environment)
+
+    def masked(self) -> dict[str, str]:
+        tail = self.api_key[-4:] if self.api_key else ""
+        return {
+            "api_key": f"••••{tail}" if tail else "",
+            "client_code": self.client_code,
+            "pin": "configured",
+            "totp_key": "configured",
+            "environment": self.environment,
+        }
+
+
+def load_credentials(row: dict[str, Any]) -> "BrokerCredentials | AngelCredentials":
+    """Decode a stored credential record, whichever broker it belongs to.
+
+    Records written before Angel existed carry no ``broker`` field and are
+    read as Kotak, so an upgrade never invalidates a working account.
+    """
+    token = row["encrypted_secrets"]
+    if str(row.get("broker") or "kotak").lower() == "angel":
+        return AngelCredentials.from_ciphertext(token)
+    return BrokerCredentials.from_ciphertext(token)
+
+
 class Vault:
     """Encrypt/decrypt helper bound to the configured master key."""
 
@@ -138,13 +227,13 @@ class Vault:
     def enabled(self) -> bool:
         return self._enabled
 
-    def encrypt(self, credentials: BrokerCredentials) -> str:
+    def encrypt(self, credentials: "BrokerCredentials | AngelCredentials") -> str:
         if not self._enabled:
             raise VaultLocked("Set CREDENTIAL_ENCRYPTION_KEY before storing broker credentials")
         with self._lock:
             return credentials.to_ciphertext()
 
-    def decrypt(self, token: str) -> BrokerCredentials:
+    def decrypt(self, token: str) -> "BrokerCredentials | AngelCredentials":
         with self._lock:
             return BrokerCredentials.from_ciphertext(token)
 

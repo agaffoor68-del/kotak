@@ -1,4 +1,13 @@
-"""Market data routes: status, instruments, quotes, candles and the feed."""
+"""Market data routes: status, instruments, quotes, candles and the feed.
+
+Market data is served by **Angel One SmartAPI** — the instrument master, live
+quotes and historical candles all come from here. Kotak Neo is never asked for
+market data; it only receives orders.
+
+Every route below resolves an Angel session through
+:func:`backend.api.deps.angel_call`, which keeps the credentials and the
+session pool out of the route bodies.
+"""
 
 from __future__ import annotations
 
@@ -8,27 +17,39 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from backend.api.deps import CurrentUser, broker_call, current_user, resolve_account_id, session_health
+from backend.angel import candles as angel_candles
+from backend.angel import instruments as angel_instruments
+from backend.angel.feed import angel_feed
+from backend.angel.quotes import QuoteError as AngelQuoteError
+from backend.angel.quotes import fetch as angel_fetch
+from backend.api.deps import CurrentUser, angel_call, current_user, require_admin
 from backend.core.config import settings
 from backend.marketdata import market_hours, master, ticks
-from backend.marketdata.feed import market_feed
-from backend.marketdata.quotes import QuoteError, quote_engine
+from backend.marketdata.quotes import quote_engine
 
 router = APIRouter(prefix="/api/v1/market", tags=["market"])
+
+#: Intervals the candle endpoint accepts (Angel's historical vocabulary).
+SUPPORTED_INTERVALS = list(ticks.INTERVAL_SECONDS)
 
 
 @router.get("/status")
 def status_route(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
-    """Market session, feed health and master-sync state."""
-    account_id = resolve_account_id(user)
+    """Market session, feed health and instrument-master state.
+
+    `scrip_master` reports the shared table (populated from Angel);
+    `angel_instruments` reports Angel's own sync bookkeeping.
+    """
     return {
         "session": market_hours.session_state(),
         "seconds_until_open": market_hours.seconds_until_open(),
-        "feed": market_feed.health(),
+        "data_source": "angel_one",
+        "feed": angel_feed.health(),
         "scrip_master": master.status(),
-        "broker_session": session_health(account_id),
+        "angel_instruments": angel_instruments.status(),
+        "quotes_cache": quote_engine.health(),
         "record_ticks": settings.record_ticks,
-        "intervals": ticks.supported_intervals(),
+        "intervals": SUPPORTED_INTERVALS,
         "server_time": time.time(),
     }
 
@@ -44,7 +65,7 @@ def search_instruments(
     if not master.status()["instruments"]:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            "The symbol master is empty. Run a scrip-master sync so real instruments are available.",
+            "The instrument master is empty. Sync the Angel One instrument master first.",
         )
     results = master.search(q, limit=limit, exchange_segment=exchange_segment)
     return {"query": q, "count": len(results), "results": results}
@@ -102,28 +123,29 @@ def fetch_quotes(
     payload: QuoteRequestModel,
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
-    """Fetch a live snapshot for a list of `{instrument_token, exchange_segment}` pairs."""
-    account_id = resolve_account_id(user)
+    """Fetch a live snapshot from Angel One for `{instrument_token, exchange_segment}` pairs."""
     tokens = payload.tokens
     if not tokens:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Provide at least one instrument")
-    if len(tokens) > settings.max_tokens_per_quote_call:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"At most {settings.max_tokens_per_quote_call} instruments per request.",
-        )
 
-    call = broker_call(account_id)
+    call = angel_call(user)
+    keys = [
+        (str(item.get("instrument_token") or item.get("token") or ""), item.get("exchange_segment", "nse_cm"))
+        for item in tokens
+    ]
+    keys = [(token, segment) for token, segment in keys if token]
     try:
-        quotes = quote_engine.fetch(call, tokens, payload.quote_type)
-    except QuoteError as error:
+        quotes = angel_fetch(call, keys, payload.quote_type)
+    except AngelQuoteError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
 
     for quote in quotes:
+        quote_engine.store(quote)
         ticks.record_quote(quote)
     ticks.flush()
     return {
         "as_of": time.time(),
+        "source": "angel_one",
         "count": len(quotes),
         "quotes": [quote.to_dict() for quote in quotes],
     }
@@ -135,37 +157,58 @@ def get_candles(
     exchange_segment: str = Query(default="nse_cm"),
     interval: str = Query(default="5m"),
     limit: int = Query(default=300, ge=1, le=5000),
+    days: int | None = Query(default=None, ge=1, le=1800),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
-    """Recorded OHLCV candles.
+    """Historical OHLCV candles from Angel One SmartAPI.
 
-    These are built from ticks this platform has recorded, because Kotak Neo
-    publishes no historical candles. `coverage` makes the gap explicit.
+    This is the endpoint that makes the dual-broker split worthwhile: Kotak Neo
+    publishes no historical candles at all, so charts, indicators and backtests
+    read Angel's candle API. The candles are also persisted, so coverage grows
+    and a repeated request costs nothing.
     """
-    if interval not in ticks.INTERVAL_SECONDS:
+    if interval not in angel_candles.INTERVAL_MAP:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Unsupported interval '{interval}'. Available: {', '.join(ticks.supported_intervals())}",
+            f"Unsupported interval '{interval}'. Available: {', '.join(angel_candles.supported_intervals())}",
         )
-    candles = ticks.history(token, exchange_segment, interval, limit)
+    call = angel_call(user)
+    try:
+        candles, from_cache = angel_candles.history(
+            call, token, exchange_segment, interval, limit, days=days,
+        )
+    except angel_candles.CandleError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+
     coverage = ticks.coverage(token, exchange_segment)
     return {
-        "token": token, "exchange_segment": exchange_segment, "interval": interval,
-        "candles": candles, "count": len(candles), "coverage": coverage,
+        "token": token,
+        "exchange_segment": exchange_segment,
+        "interval": interval,
+        "source": "angel_one",
+        "candles": candles,
+        "count": len(candles),
+        "cached": from_cache,
+        "coverage": coverage,
     }
 
 
 @router.post("/sync-master")
 def sync_master(
     force: bool = Query(default=False),
-    user: CurrentUser = Depends(current_user),
+    user: CurrentUser = Depends(require_admin),
 ) -> dict[str, Any]:
-    """Download the scrip master from Kotak (admin only through the broker gate)."""
-    account_id = resolve_account_id(user)
-    if not master.is_due(force):
-        return {"status": "skipped", "reason": "A sync already ran recently.", **master.status()}
-    call = broker_call(account_id)
-    return master.sync(lambda method, *a, **k: call(method, *a, **k))
+    """Download the instrument master from Angel One SmartAPI.
+
+    The file is public (it needs no session), so this endpoint does not touch
+    the broker credentials — it is an admin action because it rewrites the
+    shared `instruments` table.
+    """
+    if not force and not angel_instruments.is_due():
+        return {"status": "skipped", "reason": "A sync already ran recently.", **angel_instruments.status()}
+    result = angel_instruments.sync()
+    angel_candles.clear_cache()
+    return {**result, "master": master.status()}
 
 
 @router.get("/breadth")
@@ -174,19 +217,21 @@ def market_breadth(
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
     """Advance/decline breadth over a real universe of instruments."""
-    account_id = resolve_account_id(user)
-    universe = master.universe("nse_cm", limit)
+    universe = angel_instruments.equity_universe("nse_cm", limit)
+    if not universe:
+        universe = master.universe("nse_cm", limit)
     if not universe:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            "No instruments in the symbol master. Run a scrip-master sync first.",
+            "No instruments in the master. Sync the Angel One instrument master first.",
         )
-    tokens = [{"instrument_token": item["token"], "exchange_segment": item["exchange_segment"]} for item in universe]
-    call = broker_call(account_id)
-    quotes = quote_engine.fetch_batched(call, tokens, quote_type="ltp")
+    call = angel_call(user)
+    keys = [(item["token"], item["exchange_segment"]) for item in universe]
+    quotes = angel_fetch(call, keys, quote_type="ltp")
 
     return {
         "as_of": time.time(),
+        "source": "angel_one",
         "universe_size": len(universe),
         "priced": len([q for q in quotes if q.last is not None]),
         "breadth": market_hours.breadth(quotes),
@@ -206,10 +251,15 @@ def subscribe_feed(
     parsed = [token.strip() for token in tokens.split(",") if token.strip()]
     if not parsed:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "No tokens supplied")
-    added = market_feed.subscribe([
+    added = angel_feed.subscribe([
         {"instrument_token": token, "exchange_segment": exchange_segment} for token in parsed
     ])
-    return {"subscribed": added, "total": len(market_feed.subscription_tokens()), "feed": market_feed.health()}
+    return {
+        "subscribed": added,
+        "total": len(angel_feed.subscription_tokens()),
+        "source": "angel_one",
+        "feed": angel_feed.health(),
+    }
 
 
 @router.get("/feed/unsubscribe")
@@ -217,5 +267,5 @@ def unsubscribe_feed(
     tokens: str = Query(description="Comma-separated instrument tokens"),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
-    removed = market_feed.unsubscribe([token.strip() for token in tokens.split(",") if token.strip()])
-    return {"unsubscribed": removed, "total": len(market_feed.subscription_tokens())}
+    removed = angel_feed.unsubscribe([token.strip() for token in tokens.split(",") if token.strip()])
+    return {"unsubscribed": removed, "total": len(angel_feed.subscription_tokens())}

@@ -1,9 +1,10 @@
 "use client";
 
-/** Order ticket: live Kotak Neo routing and paper simulation, side by side. */
+/** Order ticket: dual-broker live routing (Kotak Neo / Angel One / both) and paper simulation. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, LIVE_PHRASE } from "@/lib/api";
+import type { ExecutionBroker } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
 import { ErrorNote, Field, Modal, Panel } from "@/components/ui";
 import { inr, num, percent } from "@/lib/format";
@@ -55,6 +56,7 @@ function TradeDesk() {
     validity: "DAY",
   });
   const [equity, setEquity] = useState(500000);
+  const [broker, setBroker] = useState<ExecutionBroker>("kotak");
   const [charges, setCharges] = useState<{ round_trip: number; break_even_move_percent: number | null } | null>(null);
   const [result, setResult] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -107,8 +109,9 @@ function TradeDesk() {
     setBusy(true);
     setResult(null);
     try {
-      const response = await api.liveOrder({ ...ticket, equity, confirmation: LIVE_PHRASE });
-      setResult({ tone: "ok", text: `Submitted to Kotak Neo:\n${JSON.stringify(response, null, 2)}` });
+      const response = await api.liveOrder({ ...ticket, equity, broker, confirmation: LIVE_PHRASE });
+      const label = broker === "both" ? "both brokers" : broker === "angel" ? "Angel One" : "Kotak Neo";
+      setResult({ tone: "ok", text: `Submitted to ${label}:\n${JSON.stringify(response, null, 2)}` });
       setError(null);
       setConfirming(false);
       setPhrase("");
@@ -117,14 +120,14 @@ function TradeDesk() {
     } finally {
       setBusy(false);
     }
-  }, [ticket, equity]);
+  }, [ticket, equity, broker]);
 
   return (
     <div className="space-y-4">
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Order ticket</h1>
         <p className="text-2xs text-ink-faint">
-          Real orders route to Kotak Neo and the exchange. Paper orders fill against the same live quotes.
+          Live prices from Angel One SmartAPI. Real orders route to Kotak Neo, Angel One, or both.
         </p>
       </header>
 
@@ -159,6 +162,14 @@ function TradeDesk() {
                       {option.label}
                     </option>
                   ))}
+                </select>
+              </Field>
+              <Field label="Broker" hint="Where the live order is sent">
+                <select className="field-select" value={broker}
+                  onChange={(e) => setBroker(e.target.value as ExecutionBroker)}>
+                  <option value="kotak">Kotak Neo</option>
+                  <option value="angel">Angel One</option>
+                  <option value="both">Both (fan out)</option>
                 </select>
               </Field>
               <Field label="Trading symbol" hint="e.g. RELIANCE-EQ">
@@ -220,7 +231,7 @@ function TradeDesk() {
             </div>
           </Panel>
 
-          <Panel title="Submit" subtitle="A live order is checked by the risk engine before it reaches Kotak">
+          <Panel title="Submit" subtitle="A live order is checked by the risk engine before it reaches any broker">
             <div className="flex flex-wrap items-center gap-2">
               <button className="btn btn-buy btn-lg" onClick={() => set("transaction_type", "B")} type="button">
                 Buy
@@ -302,14 +313,14 @@ function TradeDesk() {
               Cancel
             </button>
             <button className="btn btn-danger" onClick={() => void sendLive()} disabled={busy || phrase !== LIVE_PHRASE} type="button">
-              Send to Kotak Neo
+              {broker === "both" ? "Send to both brokers" : broker === "angel" ? "Send to Angel One" : "Send to Kotak Neo"}
             </button>
           </>
         }
       >
         <p className="text-2xs leading-relaxed text-ink-dim">
-          This submits a <span className="font-semibold text-down">real order</span> to Kotak Neo. It will be
-          routed to the exchange and may fill.
+          This submits a <span className="font-semibold text-down">real order</span>. It is sent to the
+          broker you selected and will be routed to the exchange, where it may fill.
         </p>
         <dl className="space-y-1.5 rounded border border-hairline bg-canvas p-3 text-2xs">
           <Row label="Side" value={ticket.transaction_type === "B" ? "BUY" : "SELL"} />

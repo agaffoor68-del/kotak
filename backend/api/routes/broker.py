@@ -1,9 +1,13 @@
-"""Broker connection panel: connect a Kotak Neo account and diagnose the network.
+"""Broker connection panel: connect a Kotak Neo or Angel One account.
 
 This is deliberately a separate surface from `settings` — it is where a user
-pastes their own Consumer Key / TOTP / MPIN, verifies them against Kotak, and
-sees which address (IPv4 or IPv6) the API resolves to. Secrets go straight into
-the vault; only masked views ever leave this module.
+pastes their own broker credentials, verifies them against the broker, and sees
+which address the endpoints resolve to. Secrets go straight into the vault; only
+masked views ever leave this module.
+
+Kotak is used only for order execution. Angel One serves the market data, so an
+Angel account is what makes quotes, candles and the instrument master work; the
+routes here mirror the Kotak ones so both brokers are connected the same way.
 """
 
 from __future__ import annotations
@@ -16,12 +20,19 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
-from backend.api.deps import CurrentUser, current_user, require_trader, session_health
+from backend.angel.auth import AngelAuthError, angel_session_manager
+from backend.api.deps import (
+    CurrentUser,
+    angel_session_health,
+    current_user,
+    require_trader,
+    session_health,
+)
 from backend.broker import accounts
 from backend.broker.neo_auth import NeoAuthError, session_manager
 from backend.core.config import settings
 from backend.core.database import app_cursor, row_to_dict
-from backend.core.vault import BrokerCredentials, VaultLocked, vault
+from backend.core.vault import AngelCredentials, BrokerCredentials, VaultLocked, vault
 
 router = APIRouter(prefix="/api/v1/broker", tags=["broker"])
 
@@ -114,16 +125,23 @@ def list_accounts_route(user: CurrentUser = Depends(current_user)) -> dict[str, 
     """Every account this user is allowed to see, with live session state."""
     allowed = _owned_account_ids(user)
     visible = [row for row in accounts.list_accounts() if row["account_id"] in allowed]
+
+    def health_for(row: dict[str, Any]) -> dict[str, Any]:
+        if str(row.get("broker") or accounts.KOTAK).lower() == accounts.ANGEL:
+            return angel_session_health(row["account_id"])
+        return session_health(row["account_id"])
+
     return {
         "is_admin": user.is_admin,
         "accounts": [
             {
                 "account_id": row["account_id"],
+                "broker": str(row.get("broker") or accounts.KOTAK).lower(),
                 "label": row["label"],
                 "environment": row["environment"],
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
-                "session": session_health(row["account_id"]),
+                "session": health_for(row),
             }
             for row in visible
         ],
@@ -400,5 +418,142 @@ def own_session(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
     """Session state for whichever account this caller is bound to."""
     account_id = user.account_id or accounts.default_account_id()
     if not account_id:
-        return {"account_id": None, "status": "disconnected", "message": "No Kotak account connected yet."}
-    return _account_view(account_id)
+        return {
+            "account_id": None,
+            "status": "disconnected",
+            "message": "No broker account connected yet.",
+            "angel": angel_session_health(),
+        }
+    view = _account_view(account_id)
+    view["angel"] = angel_session_health()
+    return view
+
+
+# --------------------------------------------------------------- Angel One
+
+
+class AngelConnectRequest(BaseModel):
+    """The credential set Angel One SmartAPI needs to log one account in."""
+
+    label: str = Field(default="My Angel One account", min_length=1, max_length=80)
+    api_key: str = Field(min_length=1, max_length=256)
+    client_code: str = Field(min_length=3, max_length=40)
+    pin: str = Field(min_length=1, max_length=32)
+    totp_key: str = Field(min_length=1, max_length=256)
+    environment: str = "prod"
+    #: Verify with Angel before persisting. On by default, so a typo is caught
+    #: at the form rather than surfacing later as a silent data outage.
+    test_before_save: bool = True
+
+    @field_validator("environment")
+    @classmethod
+    def _valid_environment(cls, value: str) -> str:
+        value = (value or "").strip().lower()
+        if value not in {"prod", "uat"}:
+            raise ValueError("environment must be 'prod' or 'uat'")
+        return value
+
+    def to_credentials(self) -> AngelCredentials:
+        return AngelCredentials(
+            api_key=self.api_key.strip(),
+            client_code=self.client_code.strip(),
+            pin=self.pin.strip(),
+            totp_key=self.totp_key.strip(),
+            environment=self.environment,
+        )
+
+
+@router.post("/angel/accounts", status_code=status.HTTP_201_CREATED)
+def connect_angel_account(
+    payload: AngelConnectRequest, user: CurrentUser = Depends(require_trader)
+) -> dict[str, Any]:
+    """Store this user's Angel One credentials, encrypted.
+
+    The client code becomes the account id. Angel is the market-data broker, so
+    this is the account that makes quotes and candles work platform-wide.
+    """
+    try:
+        credentials = payload.to_credentials()
+    except ValueError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
+
+    if payload.test_before_save:
+        outcome = angel_session_manager.probe(credentials)
+        if not outcome["ok"]:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, outcome["error"])
+
+    account_id = credentials.client_code
+    try:
+        saved = accounts.save_account(
+            account_id=account_id,
+            label=payload.label.strip(),
+            credentials=credentials,
+            broker=accounts.ANGEL,
+            environment=credentials.environment,
+        )
+    except VaultLocked as error:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(error)) from error
+
+    with app_cursor() as cursor:
+        cursor.execute("UPDATE users SET account_id = ? WHERE id = ? AND (account_id IS NULL OR account_id = '')",
+                       (account_id, user.id))
+
+    angel_session_manager.invalidate(account_id)
+    return {
+        "account": {**accounts.account_status(account_id), "session": angel_session_health(account_id)},
+        "masked": saved["credentials"],
+        "verified": bool(payload.test_before_save),
+        "bound_to_user": user.id,
+    }
+
+
+class AngelTestRequest(BaseModel):
+    """Verify Angel credentials that have not been saved yet."""
+
+    api_key: str = Field(min_length=1, max_length=256)
+    client_code: str = Field(min_length=3, max_length=40)
+    pin: str = Field(min_length=1, max_length=32)
+    totp_key: str = Field(min_length=1, max_length=256)
+    environment: str = "prod"
+
+
+@router.post("/angel/test")
+def test_angel_unsaved(payload: AngelTestRequest, user: CurrentUser = Depends(require_trader)) -> dict[str, Any]:
+    """Check Angel credentials before storing them."""
+    try:
+        credentials = AngelCredentials(
+            api_key=payload.api_key.strip(),
+            client_code=payload.client_code.strip(),
+            pin=payload.pin.strip(),
+            totp_key=payload.totp_key.strip(),
+            environment=payload.environment,
+        )
+    except ValueError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
+    return angel_session_manager.probe(credentials)
+
+
+@router.post("/angel/session/reconnect")
+def reconnect_angel(user: CurrentUser = Depends(require_trader)) -> dict[str, Any]:
+    """Drop the cached Angel session and log in again."""
+    account_id = accounts.default_account_id(accounts.ANGEL)
+    if not account_id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "No Angel One account is connected. Add your SmartAPI credentials first.",
+        )
+    credentials = accounts.get_credentials(account_id)
+    if not isinstance(credentials, AngelCredentials):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No Angel One credentials stored for '{account_id}'.")
+    angel_session_manager.invalidate(account_id)
+    try:
+        angel_session_manager.get(account_id, credentials)
+    except AngelAuthError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+    return angel_session_health(account_id)
+
+
+@router.get("/angel/session")
+def angel_session(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    """Session state of the Angel One market-data account."""
+    return angel_session_health()

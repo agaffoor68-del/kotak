@@ -89,7 +89,7 @@ function Overview() {
         <div>
           <h1 className="text-lg font-semibold tracking-tight">Market overview</h1>
           <p className="text-2xs text-ink-faint">
-            Live from Kotak Neo · {status ? `updated ${relative(status.session ? Date.now() / 1000 : null)}` : "connecting"}
+            Live from Angel One SmartAPI · {status ? `updated ${relative(status.session ? Date.now() / 1000 : null)}` : "connecting"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -98,10 +98,10 @@ function Overview() {
               {num(breadth?.priced ?? 0)} / {num(breadth?.universe_size ?? 0)} priced
             </span>
           ) : null}
-          {status?.broker_session?.authenticated ? (
-            <StatusChip status="live" label="Kotak session live" />
+          {status?.feed?.status === "connected" ? (
+            <StatusChip status="live" label="Angel data feed live" />
           ) : (
-            <StatusChip status="warn" label="Kotak offline" />
+            <StatusChip status="warn" label="Angel feed offline" />
           )}
           <button className="btn btn-sm" onClick={() => void load()} type="button">
             Refresh
@@ -225,7 +225,7 @@ function Overview() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel
           title="Risk posture"
-          subtitle="Every order clears these controls before reaching Kotak"
+          subtitle="Every order clears these controls before reaching the broker"
           actions={
             risk?.trading_halted ? <StatusChip status="error" label="Trading halted" /> : <StatusChip status="live" label="Trading allowed" />
           }
@@ -259,14 +259,10 @@ function Overview() {
           )}
         </Panel>
 
-        <Panel title="System" subtitle="Broker, feed and data provenance">
+        <Panel title="System" subtitle="Data source, feed and provenance">
           <dl className="space-y-2.5 text-2xs">
-            <Row
-              label="Kotak Neo session"
-              value={status?.broker_session?.status ?? "—"}
-              tone={status?.broker_session?.authenticated ? "up" : "down"}
-            />
-            <Row label="WebSocket feed" value={status?.feed?.status ?? "—"} tone={feed.state === "live" ? "up" : "warn"} />
+            <Row label="Market data" value={status?.data_source === "angel_one" ? "Angel One SmartAPI" : status?.data_source ?? "—"} tone="up" />
+            <Row label="Live feed" value={status?.feed?.status ?? "—"} tone={feed.state === "live" ? "up" : "warn"} />
             <Row label="Ticks received" value={compact(feed.frames)} />
             <Row label="Reconnects" value={compact(status?.feed?.reconnects ?? 0)} />
             <Row
@@ -276,9 +272,14 @@ function Overview() {
             />
             <Row label="Tick recording" value={status?.record_ticks ? "enabled" : "disabled"} tone={status?.record_ticks ? "up" : "warn"} />
           </dl>
-          {status?.broker_session?.last_error ? (
+          {status?.angel_instruments?.last_error ? (
             <p className="mt-3 rounded border border-warn/40 bg-warn-soft px-3 py-2 text-2xs text-warn">
-              {status.broker_session.last_error}
+              {status.angel_instruments.last_error}
+            </p>
+          ) : null}
+          {status?.feed?.last_error ? (
+            <p className="mt-3 rounded border border-warn/40 bg-warn-soft px-3 py-2 text-2xs text-warn">
+              {status.feed.last_error}
             </p>
           ) : null}
         </Panel>

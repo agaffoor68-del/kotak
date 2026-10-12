@@ -127,7 +127,7 @@ function PaperDesk() {
         <div>
           <h1 className="text-lg font-semibold tracking-tight">Paper trading</h1>
           <p className="text-2xs text-ink-faint">
-            Same strategy engine, filled against live Kotak quotes — no exchange involvement
+            Same strategy engine, filled against live Angel One quotes — no exchange involvement
           </p>
         </div>
         <div className="flex items-center gap-2">

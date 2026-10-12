@@ -22,6 +22,7 @@ from backend.backtesting.engine import _warmup_bars
 from backend.core.config import settings
 from backend.core.database import app_cursor, now
 from backend.execution import live
+from backend.execution import order_service
 from backend.marketdata import master, ticks
 from backend.marketdata.market_hours import is_market_open, session_state
 from backend.marketdata.quotes import quote_engine
@@ -40,6 +41,8 @@ class AlgoRun:
     name: str
     mode: str                 # paper or live
     interval: str
+    #: Which broker live orders go to: kotak, angel or both.
+    broker: str | None = None
     status: str = "pending"   # pending, running, halted, completed, error, stopped
     reason: str | None = None
     started_at: float = field(default_factory=time.time)
@@ -59,6 +62,7 @@ class AlgoRun:
         return {
             "id": self.id, "strategy_id": self.strategy_id, "account_id": self.account_id,
             "name": self.name, "mode": self.mode, "interval": self.interval,
+            "broker": self.broker,
             "status": self.status, "reason": self.reason,
             "started_at": self.started_at, "stopped_at": self.stopped_at,
             "evaluations": self.evaluations, "signals": self.signals,
@@ -77,7 +81,7 @@ class AlgoSupervisor:
         self._lock = threading.RLock()
 
     # -- lifecycle -------------------------------------------------------
-    def start(self, strategy: dict[str, Any], account_id: str, mode: str) -> AlgoRun:
+    def start(self, strategy: dict[str, Any], account_id: str, mode: str, broker: str | None = None) -> AlgoRun:
         definition = strategy.get("definition") or {}
         validation = dsl.validate(definition)
         if not validation["valid"]:
@@ -92,6 +96,11 @@ class AlgoSupervisor:
             from backend.strategies import lifecycle
 
             lifecycle.assert_live_allowed(strategy)
+            # Validate the routing choice up-front, so a bad broker name is
+            # rejected at deploy time rather than on the first signal.
+            from backend.execution import brokers as broker_registry
+
+            broker_registry.targets_for(account_id, broker)
 
         interval = str(definition.get("timeframe") or "5m")
         if interval not in ticks.INTERVAL_SECONDS:
@@ -100,7 +109,7 @@ class AlgoSupervisor:
         run = AlgoRun(
             id=uuid.uuid4().hex, strategy_id=strategy["id"], account_id=account_id,
             name=str(strategy.get("name") or definition.get("name") or "Strategy"),
-            mode=mode, interval=interval, status="running",
+            mode=mode, interval=interval, broker=(broker or settings.default_execution_broker), status="running",
         )
         stop = threading.Event()
         thread = threading.Thread(target=self._loop, args=(run, definition, stop), name=f"algo-{run.id[:8]}", daemon=True)
@@ -278,12 +287,16 @@ class AlgoSupervisor:
             if run.mode == "paper":
                 result = paper.place_paper_order(order, account_id=run.account_id, strategy_run_id=run.id)
             else:
-                result = live.place_order(
-                    order, account_id=run.account_id, confirmation=live.LIVE_ORDER_PHRASE,
-                    equity=equity, is_market_open=True, strategy_run_id=run.id,
+                # Live orders go through the order service, so a strategy and a
+                # hand-placed order are subject to exactly the same gates, and
+                # the routing choice (kotak / angel / both) is honoured.
+                result = order_service.place(
+                    order, account_id=run.account_id, broker=run.broker,
+                    confirmation=live.LIVE_ORDER_PHRASE, equity=equity,
+                    is_market_open=True, strategy_run_id=run.id,
                 )
             run.orders_placed += 1
-            run.note(f"order placed: {quantity} {order['trading_symbol']} ({run.mode})")
+            run.note(f"order placed: {quantity} {order['trading_symbol']} ({run.mode}/{run.broker or '-'})")
             if exit_signal:
                 run.note("exit signal also fired on the entry bar; monitor closely")
         except (RuntimeError, live.OrderRejected) as error:

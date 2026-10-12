@@ -86,6 +86,28 @@ def _migrate_app_schema() -> None:
     keeps upgrades safe without needing to drop user data.
     """
     with app_cursor() as cursor:
+        cursor.execute("PRAGMA table_info(broker_accounts)")
+        broker_columns = {row["name"] for row in cursor.fetchall()}
+        if "broker" not in broker_columns:
+            # Databases created before Angel One existed hold Kotak accounts.
+            cursor.execute("ALTER TABLE broker_accounts ADD COLUMN broker TEXT NOT NULL DEFAULT 'kotak'")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_broker_accounts_broker ON broker_accounts(broker, is_active)")
+
+    with app_cursor() as cursor:
+        cursor.execute("PRAGMA table_info(instruments)")
+        instrument_columns = {row["name"] for row in cursor.fetchall()}
+        if "source" not in instrument_columns:
+            cursor.execute("ALTER TABLE instruments ADD COLUMN source TEXT NOT NULL DEFAULT 'kotak'")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_instruments_source ON instruments(source)")
+
+    with app_cursor() as cursor:
+        cursor.execute("PRAGMA table_info(orders)")
+        order_columns = {row["name"] for row in cursor.fetchall()}
+        if "broker" not in order_columns:
+            cursor.execute("ALTER TABLE orders ADD COLUMN broker TEXT NOT NULL DEFAULT 'kotak'")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_broker ON orders(broker, created_at DESC)")
+
+    with app_cursor() as cursor:
         cursor.execute("PRAGMA table_info(strategies)")
         columns = {row["name"] for row in cursor.fetchall()}
         additions = (
@@ -127,6 +149,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 CREATE TABLE IF NOT EXISTS broker_accounts (
     id                 TEXT PRIMARY KEY,
     account_id         TEXT NOT NULL UNIQUE,
+    broker             TEXT NOT NULL DEFAULT 'kotak',
     label              TEXT NOT NULL,
     encrypted_secrets  TEXT NOT NULL,
     environment        TEXT NOT NULL DEFAULT 'prod',
@@ -134,6 +157,7 @@ CREATE TABLE IF NOT EXISTS broker_accounts (
     created_at         REAL NOT NULL,
     updated_at         REAL NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_broker_accounts_broker ON broker_accounts(broker, is_active);
 
 CREATE TABLE IF NOT EXISTS instruments (
     token            TEXT NOT NULL,
@@ -152,12 +176,14 @@ CREATE TABLE IF NOT EXISTS instruments (
     underlying       TEXT,
     multiplier       REAL,
     is_index         INTEGER NOT NULL DEFAULT 0,
+    source           TEXT NOT NULL DEFAULT 'kotak',
     updated_at       REAL NOT NULL,
     PRIMARY KEY (token, exchange_segment)
 );
 CREATE INDEX IF NOT EXISTS idx_instruments_symbol ON instruments(symbol);
 CREATE INDEX IF NOT EXISTS idx_instruments_underlying ON instruments(underlying);
 CREATE INDEX IF NOT EXISTS idx_instruments_expiry ON instruments(exchange_segment, expiry);
+CREATE INDEX IF NOT EXISTS idx_instruments_source ON instruments(source);
 
 CREATE TABLE IF NOT EXISTS strategies (
     id          TEXT PRIMARY KEY,
@@ -221,6 +247,7 @@ CREATE INDEX IF NOT EXISTS idx_runs_strategy ON strategy_runs(strategy_id);
 CREATE TABLE IF NOT EXISTS orders (
     id                 TEXT PRIMARY KEY,
     account_id         TEXT NOT NULL,
+    broker             TEXT NOT NULL DEFAULT 'kotak',
     strategy_run_id    TEXT,
     mode               TEXT NOT NULL,
     broker_order_id    TEXT,
@@ -242,6 +269,7 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 CREATE INDEX IF NOT EXISTS idx_orders_account ON orders(account_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_run ON orders(strategy_run_id);
+CREATE INDEX IF NOT EXISTS idx_orders_broker ON orders(broker, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS trades (
     id            TEXT PRIMARY KEY,

@@ -255,7 +255,10 @@ export interface MarketStatus {
     weekday: string;
   };
   seconds_until_open: number;
+  /** Every quote and candle here comes from Angel One SmartAPI. */
+  data_source: string;
   feed: {
+    broker?: string;
     status: string;
     frames_received: number;
     reconnects: number;
@@ -269,7 +272,8 @@ export interface MarketStatus {
     last_sync: number | null;
     last_error: string | null;
   };
-  broker_session: {
+  angel_instruments?: AngelInstrumentStatus;
+  broker_session?: {
     configured?: boolean;
     authenticated?: boolean;
     status: string;
@@ -508,7 +512,10 @@ export const api = {
   underlyings: () => get<string[]>("/api/v1/market/underlyings"),
   futures: (exchangeSegment = "nse_fo") => get<Instrument[]>(`/api/v1/market/futures?exchange_segment=${exchangeSegment}`),
   quotes: (tokens: { instrument_token: string; exchange_segment: string }[], quoteType = "all") =>
-    post<{ as_of: number; count: number; quotes: Quote[] }>("/api/v1/market/quotes", { tokens, quote_type: quoteType }),
+    post<{ as_of: number; source: string; count: number; quotes: Quote[] }>("/api/v1/market/quotes", {
+      tokens,
+      quote_type: quoteType,
+    }),
   breadth: (limit = 200) =>
     get<{
       universe_size: number;
@@ -518,9 +525,11 @@ export const api = {
       top_losers: Quote[];
       most_active: Quote[];
     }>(`/api/v1/market/breadth?limit=${limit}`),
-  candles: (token: string, exchangeSegment: string, interval: string, limit = 400) =>
-    get<{ candles: Candle[]; count: number; coverage: Coverage }>(
-      `/api/v1/market/candles/${encodeURIComponent(token)}?exchange_segment=${exchangeSegment}&interval=${interval}&limit=${limit}`,
+  candles: (token: string, exchangeSegment: string, interval: string, limit = 400, days?: number) =>
+    get<{ candles: Candle[]; count: number; cached: boolean; coverage: Coverage }>(
+      `/api/v1/market/candles/${encodeURIComponent(token)}?exchange_segment=${exchangeSegment}&interval=${interval}&limit=${limit}${
+        days ? `&days=${days}` : ""
+      }`,
     ),
   syncMaster: (force = false) => post<Record<string, unknown>>(`/api/v1/market/sync-master?force=${force}`),
   subscribe: (tokens: string[], exchangeSegment = "nse_cm") =>
@@ -566,7 +575,9 @@ export const api = {
   }) => post<BacktestResult>("/api/v1/strategies/backtest", body),
 
   // execution
-  portfolio: () => get<Record<string, unknown>>("/api/v1/portfolio"),
+  portfolio: (broker?: ExecutionBroker) =>
+    get<Record<string, unknown>>(`/api/v1/portfolio${broker ? `?broker=${broker}` : ""}`),
+  executionBrokers: () => get<ExecutionBrokersResponse>("/api/v1/execution/brokers"),
   charges: (exchangeSegment: string, product: string, quantity: number, price: number) =>
     get<{
       buy: Record<string, number>;
@@ -575,8 +586,12 @@ export const api = {
       break_even_move_percent: number | null;
     }>(`/api/v1/charges?exchange_segment=${exchangeSegment}&product=${product}&quantity=${quantity}&price=${price}`),
   liveOrder: (order: Record<string, unknown>) => post<Record<string, unknown>>("/api/v1/orders/live", order),
-  cancelOrder: (orderId: string) =>
-    post<Record<string, unknown>>("/api/v1/orders/cancel", { order_id: orderId, confirmation: LIVE_PHRASE }),
+  cancelOrder: (orderId: string, broker?: ExecutionBroker) =>
+    post<Record<string, unknown>>("/api/v1/orders/cancel", {
+      order_id: orderId,
+      broker: broker ?? null,
+      confirmation: LIVE_PHRASE,
+    }),
   paperOrder: (order: Record<string, unknown>) => post<Record<string, unknown>>("/api/v1/paper/orders", order),
   paperClose: (symbol: string, quantity?: number) =>
     post<Record<string, unknown>>("/api/v1/paper/close", { trading_symbol: symbol, quantity }),
@@ -614,8 +629,10 @@ export const api = {
     put<Record<string, number | string>>("/api/v1/risk", changes),
   killSwitch: (reason: string) => post<Record<string, unknown>>("/api/v1/risk/kill-switch", { reason }),
   releaseKillSwitch: () => post<Record<string, unknown>>("/api/v1/risk/release"),
-  startAlgo: (strategyId: string, mode: "paper" | "live") =>
-    post<Record<string, unknown>>(`/api/v1/algo/runs?strategy_id=${strategyId}&mode=${mode}`),
+  startAlgo: (strategyId: string, mode: "paper" | "live", broker?: ExecutionBroker) =>
+    post<Record<string, unknown>>(
+      `/api/v1/algo/runs?strategy_id=${strategyId}&mode=${mode}${broker ? `&broker=${broker}` : ""}`,
+    ),
   stopAlgo: (runId: string) => post<Record<string, unknown>>(`/api/v1/algo/runs/${runId}/stop`),
   riskEvents: (limit = 50) => get<RiskEventRow[]>(`/api/v1/risk/events?limit=${limit}`),
   // The header's reconnect button; scoped to the account the caller owns.
@@ -634,6 +651,13 @@ export const api = {
     post<BrokerAccountView>(`/api/v1/broker/accounts/${encodeURIComponent(accountId)}/reconnect`),
   brokerDisconnect: (accountId: string) =>
     del<{ removed: boolean; account_id: string }>(`/api/v1/broker/accounts/${encodeURIComponent(accountId)}`),
+
+  // Angel One (market data) connection
+  angelTest: (body: AngelCredentialsInput) => post<BrokerTestResult>("/api/v1/broker/angel/test", body),
+  angelConnect: (body: AngelCredentialsInput & { label?: string; test_before_save?: boolean }) =>
+    post<AngelConnectResponse>("/api/v1/broker/angel/accounts", body),
+  angelSession: () => get<ExchangeSessionHealth>("/api/v1/broker/angel/session"),
+  angelReconnect: () => post<ExchangeSessionHealth>("/api/v1/broker/angel/session/reconnect"),
 
   // analytics
   performance: () => get<PerformancePayload>("/api/v1/analytics/performance"),
@@ -678,25 +702,33 @@ export interface BrokerCredentialsInput {
   environment: "prod" | "uat";
 }
 
-export interface BrokerSessionHealth {
+export interface ExchangeSessionHealth {
   account_id: string | null;
+  broker?: string;
   authenticated: boolean;
   status: string;
   last_error?: string | null;
   age_seconds?: number;
   expires_in_seconds?: number;
   configured?: boolean;
+  feed_token?: boolean;
+  profile?: Record<string, unknown> | null;
 }
+
+export type BrokerName = "kotak" | "angel";
+/** Where an order goes. `both` fans one signal out to every enabled broker. */
+export type ExecutionBroker = BrokerName | "both";
 
 export interface BrokerAccountView {
   account_id: string | null;
+  broker?: BrokerName;
   label?: string;
   environment?: string;
   configured?: boolean;
   is_active?: number;
   created_at?: number;
   updated_at?: number;
-  session: BrokerSessionHealth;
+  session: ExchangeSessionHealth;
   status?: string;
   message?: string;
 }
@@ -705,15 +737,52 @@ export interface BrokerAccountsResponse {
   is_admin: boolean;
   accounts: {
     account_id: string;
+    broker: BrokerName;
     label: string;
     environment: string;
     created_at: number;
     updated_at: number;
-    session: BrokerSessionHealth;
+    session: ExchangeSessionHealth;
   }[];
   default_account_id: string | null;
   vault_enabled: boolean;
   legacy_env_fallback: boolean;
+}
+
+export interface ExecutionBrokersResponse {
+  enabled: BrokerName[];
+  default: ExecutionBroker;
+  available: ExecutionBroker[];
+  data_source: string;
+}
+
+/* ---------------------------------------------------------- Angel One data */
+
+/** Exactly what the Angel One connect form collects. */
+export interface AngelCredentialsInput {
+  api_key: string;
+  client_code: string;
+  pin: string;
+  totp_key: string;
+  environment: "prod" | "uat";
+}
+
+export interface AngelConnectResponse {
+  account: BrokerAccountView;
+  /** Redacted view: API key shown as `••••xxxx`, secrets never echoed. */
+  masked: Record<string, string>;
+  verified: boolean;
+  bound_to_user: string;
+}
+
+export interface AngelInstrumentStatus {
+  source: string;
+  status: string;
+  last_sync: number | null;
+  last_error: string | null;
+  counts: Record<string, number>;
+  instruments: number;
+  stale: boolean;
 }
 
 export interface BrokerTestResult {

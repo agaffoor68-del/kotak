@@ -12,6 +12,7 @@ from backend.broker.neo_auth import NeoAuthError, session_manager
 from backend.core.config import settings
 from backend.core.security import TokenClaims, decode_access_token, verify_api_key
 from backend.core.database import app_cursor, row_to_dict
+from backend.core.vault import AngelCredentials
 
 log = logging.getLogger("alphatrade.api")
 
@@ -160,4 +161,70 @@ def session_health(account_id: str) -> dict[str, Any]:
     health = session_manager.health(account_id)
     health["configured"] = accounts.account_status(account_id).get("configured", False)
     health["credentials"] = accounts.account_status(account_id)
+    return health
+
+
+# -------------------------------------------------------- Angel One data layer
+
+
+def resolve_angel_account_id(preferred: str | None = None) -> str | None:
+    """Pick the Angel account used for market data.
+
+    Market data comes from Angel One. The account is chosen from the Angel
+    accounts that exist, or the single-account environment fallback. It is
+    deliberately *not* tied to a user: two users read the same public tape,
+    and only orders are scoped to the account that owns them.
+    """
+    if preferred:
+        return preferred
+    return accounts.default_account_id(accounts.ANGEL)
+
+
+def angel_call(user: CurrentUser | None = None, account_id: str | None = None) -> Callable[..., Any]:
+    """A callable that runs one SmartAPI request for the market-data account.
+
+    Mirrors :func:`broker_call`, but for Angel One. When no Angel account is
+    configured the caller gets a 400 explaining exactly what to do, rather
+    than an opaque connection error.
+    """
+    from backend.angel.auth import AngelAuthError, angel_session_manager
+
+    target = account_id or (user.account_id if user and user.account_id else None)
+    if target == "" or target is None:
+        target = resolve_angel_account_id()
+    elif accounts.broker_of(target) != accounts.ANGEL:
+        target = resolve_angel_account_id() or target
+
+    if not target:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "No Angel One account is configured. Add Angel One SmartAPI credentials on the "
+            "Connect broker page, or set the ANGEL_API_KEY / ANGEL_CLIENT_CODE / ANGEL_PIN / "
+            "ANGEL_TOTP_KEY environment variables.",
+        )
+
+    credentials = accounts.get_credentials(target)
+    if not isinstance(credentials, AngelCredentials):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Account '{target}' has no Angel One credentials. Market data requires an Angel One account.",
+        )
+
+    def call(method: str, path: str, **kwargs: Any) -> Any:
+        try:
+            return angel_session_manager.call(target, credentials, method, path, **kwargs)
+        except AngelAuthError as error:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+
+    return call
+
+
+def angel_session_health(account_id: str | None = None) -> dict[str, Any]:
+    from backend.angel.auth import angel_session_manager
+
+    target = account_id or resolve_angel_account_id()
+    if not target:
+        return {"broker": "angel", "account_id": None, "authenticated": False, "status": "unconfigured"}
+    health = angel_session_manager.health(target)
+    health["credentials"] = accounts.account_status(target)
     return health
