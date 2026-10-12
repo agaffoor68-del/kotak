@@ -25,7 +25,8 @@ reportlab>=4,<5
 qrcode>=7.4,<9
 ably>=2.0.0,<4
 structlog>=24,<26
-# Angel One SmartAPI order/quote calls. The candle and instrument-master
-# endpoints are called over plain HTTP (requests), so this SDK is only needed
-# for the order surface and the smart-api WebSocket feed when enabled.
-smartapi-python-client>=1.0,<2
+# NOTE: no Angel One SmartAPI SDK here on purpose. Every SmartAPI call in
+# backend/angel/ is plain HTTP over `requests` (login, refresh, candles,
+# quotes, orders, instrument master), so no third-party SDK is imported and
+# none is needed. `smartapi-python` exists on PyPI, but adding it would only
+# be dead weight and another way for the Render build to fail.
