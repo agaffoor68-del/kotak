@@ -70,6 +70,16 @@ class ConnectRequest(BaseModel):
         stripped = (value or "").strip()
         return stripped or None
 
+    def to_credentials(self) -> BrokerCredentials:
+        return BrokerCredentials(
+            consumer_key=self.consumer_key.strip(),
+            totp_key=self.totp_key.strip(),
+            mpin=self.mpin.strip(),
+            mobile_number=self.mobile_number.strip(),
+            ucc=self.ucc.strip(),
+            neo_fin_key=self.neo_fin_key,
+            environment=self.environment,
+        )
 
 
 def _owned_account_ids(user: CurrentUser) -> set[str]:
@@ -140,6 +150,27 @@ def connect_account(payload: ConnectRequest, user: CurrentUser = Depends(require
         if not outcome["ok"]:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, outcome["error"])
 
+    account_id = credentials.ucc
+    try:
+        saved = accounts.save_account(
+            account_id=account_id,
+            label=payload.label.strip(),
+            credentials=credentials,
+            environment=credentials.environment,
+        )
+    except VaultLocked as error:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(error)) from error
+
+    with app_cursor() as cursor:
+        cursor.execute("UPDATE users SET account_id = ? WHERE id = ?", (account_id, user.id))
+
+    session_manager.invalidate(account_id)
+    return {
+        "account": _account_view(account_id),
+        "masked": saved["credentials"],
+        "verified": bool(payload.test_before_save),
+        "bound_to_user": user.id,
+    }
 
 
 class TestRequest(BaseModel):
@@ -371,36 +402,3 @@ def own_session(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
     if not account_id:
         return {"account_id": None, "status": "disconnected", "message": "No Kotak account connected yet."}
     return _account_view(account_id)
-
-    account_id = credentials.ucc
-    try:
-        saved = accounts.save_account(
-            account_id=account_id,
-            label=payload.label.strip(),
-            credentials=credentials,
-            environment=credentials.environment,
-        )
-    except VaultLocked as error:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(error)) from error
-
-    with app_cursor() as cursor:
-        cursor.execute("UPDATE users SET account_id = ? WHERE id = ?", (account_id, user.id))
-
-    session_manager.invalidate(account_id)
-    return {
-        "account": _account_view(account_id),
-        "masked": saved["credentials"],
-        "verified": bool(payload.test_before_save),
-        "bound_to_user": user.id,
-    }
-
-    def to_credentials(self) -> BrokerCredentials:
-        return BrokerCredentials(
-            consumer_key=self.consumer_key.strip(),
-            totp_key=self.totp_key.strip(),
-            mpin=self.mpin.strip(),
-            mobile_number=self.mobile_number.strip(),
-            ucc=self.ucc.strip(),
-            neo_fin_key=self.neo_fin_key,
-            environment=self.environment,
-        )

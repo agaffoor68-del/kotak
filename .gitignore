@@ -18,6 +18,9 @@ fly.toml
 # --- local scratch / diagnostics (never commit) ---
 /_*.txt
 /_*.py
+/_*.ps1
+/mc.txt
+web/tsc_out.txt
 /*.log
 /*.err
 web/*.log
