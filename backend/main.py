@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend import app_bootstrap
-from backend.api.routes import analytics, auth, execution, market, options, share, strategies
+from backend.api.routes import analytics, auth, broker, execution, market, options, share, strategies
 from backend.api.ws import router as ws_router
 from backend.broker.neo_auth import session_manager
 from backend.core.config import settings
@@ -134,6 +134,7 @@ async def unhandled_error(request: Request, error: Exception) -> JSONResponse:
 # ----------------------------------------------------------------- routes
 
 app.include_router(auth.router)
+app.include_router(broker.router)
 app.include_router(market.router)
 app.include_router(options.router)
 app.include_router(strategies.router)

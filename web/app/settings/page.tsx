@@ -29,6 +29,15 @@ function Settings() {
   const [newUser, setNewUser] = useState({ email: "", password: "", role: "trader" });
   const [baseUrl, setBaseUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const [credentials, setCredentials] = useState({
+    consumer_key: "",
+    totp_key: "",
+    mpin: "",
+    mobile_number: "",
+    ucc: "",
+    environment: "prod",
+  });
+  const [credentialMessage, setCredentialMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -52,6 +61,21 @@ function Settings() {
       setApiKey(await api.createApiKey(`key-${Date.now()}`));
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Could not create an API key");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveCredentials() {
+    setBusy(true);
+    setCredentialMessage(null);
+    try {
+      const result = await api.saveKotakCredentials(credentials);
+      setCredentialMessage(result.message ?? "Credentials saved securely.");
+      setCredentials({ ...credentials, consumer_key: "", totp_key: "", mpin: "" });
+      setError(null);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not save Kotak Neo credentials");
     } finally {
       setBusy(false);
     }
@@ -138,6 +162,39 @@ function Settings() {
           ) : null}
         </>
       ) : null}
+
+      <Panel title="Kotak Neo Credentials" subtitle="Secure broker login panel — credentials are encrypted before storage">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Consumer Key">
+            <input className="field-input" type="password" autoComplete="off" value={credentials.consumer_key} onChange={(event) => setCredentials({ ...credentials, consumer_key: event.target.value })} />
+          </Field>
+          <Field label="TOTP Secret">
+            <input className="field-input" type="password" autoComplete="off" value={credentials.totp_key} onChange={(event) => setCredentials({ ...credentials, totp_key: event.target.value })} />
+          </Field>
+          <Field label="MPIN">
+            <input className="field-input" type="password" inputMode="numeric" autoComplete="off" value={credentials.mpin} onChange={(event) => setCredentials({ ...credentials, mpin: event.target.value })} />
+          </Field>
+          <Field label="Mobile Number">
+            <input className="field-input" type="tel" autoComplete="tel" value={credentials.mobile_number} onChange={(event) => setCredentials({ ...credentials, mobile_number: event.target.value })} />
+          </Field>
+          <Field label="UCC">
+            <input className="field-input" autoComplete="off" value={credentials.ucc} onChange={(event) => setCredentials({ ...credentials, ucc: event.target.value.toUpperCase() })} />
+          </Field>
+          <Field label="Environment">
+            <select className="field-select" value={credentials.environment} onChange={(event) => setCredentials({ ...credentials, environment: event.target.value })}>
+              <option value="prod">Production</option>
+              <option value="uat">UAT</option>
+            </select>
+          </Field>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button className="btn btn-primary" onClick={() => void saveCredentials()} disabled={busy || Object.values(credentials).some((value) => !value)} type="button">
+            {busy ? "Saving…" : "Save & Connect"}
+          </button>
+          <p className="text-3xs text-ink-faint">TOTP, MPIN and Consumer Key never appear in the response.</p>
+        </div>
+        {credentialMessage ? <p className="mt-3 text-2xs text-up">{credentialMessage}</p> : null}
+      </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="API key" subtitle="For automation and the WebSocket feed">

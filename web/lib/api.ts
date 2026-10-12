@@ -497,7 +497,15 @@ export const api = {
   createUser: (email: string, password: string, role: string) =>
     post<User>("/api/v1/auth/users", { email, password, role }),
   createApiKey: (name: string) => post<{ api_key: string; warning: string }>("/api/v1/auth/api-keys", { name }),
-
+  saveKotakCredentials: (payload: {
+    consumer_key: string;
+    totp_key: string;
+    mpin: string;
+    mobile_number: string;
+    ucc: string;
+    environment?: string;
+  }) => post<{ account_id: string; label: string; credentials: Record<string, string>; status: string; message: string }>("/api/v1/broker/credentials", payload),
+  
   // market
   status: () => get<MarketStatus>("/api/v1/market/status"),
   search: (q: string, limit = 25) =>
