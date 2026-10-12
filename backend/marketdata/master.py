@@ -110,7 +110,9 @@ def _parse_segment_csv(text: str, exchange_segment: str) -> Iterable[dict[str, A
             "series": (cleaned.get("pGroup") or "").strip() or None,
             "expiry": _normalise_expiry(cleaned.get("lExpiryDate", "")),
             "option_type": option_type if option_type in {"CE", "PE"} else None,
-            "strike": _to_float(cleaned.get("dStrikePrice;")),
+            # Kotak has published both `dStrikePrice` and a semicolon-suffixed
+            # header in different master files.
+            "strike": _to_float(cleaned.get("dStrikePrice") or cleaned.get("dStrikePrice;")),
             "lot_size": _to_int(cleaned.get("lLotSize")) or 1,
             "tick_size": _to_float(cleaned.get("dTickSize")) or 0.05,
             "precision": _to_int(cleaned.get("lPrecision")) or 2,

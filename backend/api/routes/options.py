@@ -29,10 +29,18 @@ def option_chain(
     account_id = resolve_account_id(user)
     contracts = master.option_contracts(underlying, exchange_segment)
     if not contracts["rows"]:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            f"No option contracts for '{underlying}' in the symbol master. Run a scrip-master sync.",
-        )
+        # A fresh deployment may have an empty/stale local master. Sync on the
+        # first option-chain request so every client gets the same recovery path
+        # instead of repeating an unusable 404 until an operator finds the
+        # internal sync endpoint.
+        sync_result = master.sync(lambda method, *a, **k: broker_call(account_id)(method, *a, **k))
+        contracts = master.option_contracts(underlying, exchange_segment)
+        if not contracts["rows"]:
+            detail = f"No option contracts for '{underlying}' after symbol-master sync."
+            warnings = sync_result.get("warnings") if isinstance(sync_result, dict) else None
+            if warnings:
+                detail += " " + "; ".join(str(warning) for warning in warnings)
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail)
 
     # Fetch live prices for every leg in batches Kotak accepts.
     tokens = []
