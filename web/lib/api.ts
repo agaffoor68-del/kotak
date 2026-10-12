@@ -5,7 +5,9 @@
  * signed in without ever writing credentials to disk.
  */
 
-const DEFAULT_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000";
+// Render hosts the production API; keep NEXT_PUBLIC_API_BASE overridable for
+// Vercel previews and local development without ever sending browsers to localhost.
+const DEFAULT_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "https://alpha-4tik.onrender.com";
 let base = DEFAULT_BASE;
 let accessToken: string | null = null;
 
