@@ -83,6 +83,7 @@ backend/
   alerts/      service (Telegram, WhatsApp, email)
   ai/          coach (deterministic patterns + optional LLM)
   api/         routes, deps (auth/RBAC, angel_call), ws
+  deployment.py  static IP detection + redirect URL resolution (SEBI prerequisites)
 ```
 
 ---
@@ -223,6 +224,16 @@ maths and the wiring. Nothing in `backend/` generates market data at runtime.
 | --- | --- | --- |
 | `ENVIRONMENT` | `development` | `production` enables stricter behaviour |
 | `DATA_DIR` | `./var` | Where the tick, state and session databases live |
+| **Deployment (static IP + redirect, SEBI)** | | |
+| `STATIC_IP` | — | The public IP registered with the broker; drives drift detection |
+| `STATIC_IP_RESERVED` | `0` | `1` once a real Elastic/Reserved IP is attached |
+| `PUBLIC_IP_OVERRIDE` | — | State the egress IP directly, skipping detection |
+| `PUBLIC_IP_CHECK` | `1` | Turn the public-IP lookup off entirely |
+| `PUBLIC_URL` | — | Canonical origin; the redirect URL derives from it |
+| `REDIRECT_PATH` | `/callback` | The broker callback path |
+| `REDIRECT_URL` | — | Pin the exact redirect string a broker was given |
+| `REDIRECT_ALLOWLIST` | — | Extra allowed callback targets (comma-separated) |
+| `REQUIRE_HTTPS` | `0` | Reject a redirect that arrives over plain HTTP |
 | **Angel One (data + optional execution)** | | |
 | `ANGEL_ENVIRONMENT` | `prod` | `prod` or `uat` |
 | `ANGEL_SESSION_TTL_SECONDS` | `28800` | Force a fresh login after this age |
@@ -258,6 +269,10 @@ maths and the wiring. Nothing in `backend/` generates market data at runtime.
 
 * **Market data is Angel One only. Execution is Kotak Neo and/or Angel One.** There is no third
   fallback broker and no fallback data source.
+* **A static IP and a registered redirect URL are deployment prerequisites**, not optional extras.
+  SEBI requires the broker to see a fixed source address on order APIs, and OAuth flows need a
+  pre-registered callback. Both are reported in **Settings → Deployment**, and the platform warns
+  the moment the egress IP stops matching the one that was registered.
 * **Candles are Angel's real history**, not a tape this platform invented. The historic feed is
   chunked, IST-corrected and cached; coverage grows as ticks are recorded too.
 * **Greeks are computed**, using exchange-reported IV or an IV backed out of the traded premium by

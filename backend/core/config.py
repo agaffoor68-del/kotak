@@ -117,6 +117,44 @@ class Settings:
         # --- websocket fan-out -------------------------------------------
         self.broadcast_queue_size = _int("BROADCAST_QUEUE_SIZE", 512)
 
+        # --- deployment: static IP + redirect URL (SEBI compliance) -------
+        # SEBI requires brokers to see a fixed, registered source IP on order
+        # APIs, so the host must sit behind a stable public address (an AWS
+        # Elastic IP, a DigitalOcean Reserved IP, a GCP static IP, ...). The
+        # platform cannot create that address for you, but it can report the
+        # one it is actually using so it can be registered on the broker
+        # portal, and warn when the observed egress IP no longer matches what
+        # was registered.
+        #
+        # The address registered with the broker. Empty means "not registered
+        # yet"; the admin panel then shows the detected IP and asks for it to
+        # be recorded here.
+        self.registered_static_ip = os.getenv("STATIC_IP", "").strip()
+        # Whether that address is actually static (Elastic/Reserved/static IP,
+        # not a dynamic one that survives only until the next reboot).
+        self.static_ip_is_reserved = _flag("STATIC_IP_RESERVED", False)
+        #: Optional override for egress-IP detection, for hosts that cannot
+        #: reach a public "what is my IP" service (air-gapped or locked-down).
+        self.public_ip_override = os.getenv("PUBLIC_IP_OVERRIDE", "").strip()
+        self.public_ip_check_url = os.getenv("PUBLIC_IP_CHECK_URL", "https://api.ipify.org").strip()
+        self.public_ip_check_enabled = _flag("PUBLIC_IP_CHECK", True)
+        self.public_ip_cache_seconds = _int("PUBLIC_IP_CACHE_SECONDS", 300)
+
+        # OAuth / broker-API redirect. This is where a broker sends the user
+        # back after they authorise the app, so it must be a URL the broker
+        # has been told about and that resolves from the public internet.
+        # Falls back to PUBLIC_URL + REDIRECT_PATH when not set explicitly.
+        self.redirect_path = os.getenv("REDIRECT_PATH", "/callback").strip() or "/callback"
+        self.redirect_url = os.getenv("REDIRECT_URL", "").strip().rstrip("/")
+        #: Extra redirect targets a broker may have been given, comma-separated
+        #: (e.g. a localhost one for development alongside the production URL).
+        self.redirect_allowlist = [
+            value.strip().rstrip("/")
+            for value in os.getenv("REDIRECT_ALLOWLIST", "").split(",")
+            if value.strip()
+        ]
+        self.require_https = _flag("REQUIRE_HTTPS", False)
+
         # --- alerts ------------------------------------------------------
         self.telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
         self.telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "")

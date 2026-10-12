@@ -21,7 +21,17 @@ from fastapi.responses import JSONResponse
 from backend import app_bootstrap
 from backend.angel.auth import angel_session_manager
 from backend.angel.feed import angel_feed
-from backend.api.routes import analytics, auth, broker, execution, market, options, share, strategies
+from backend.api.routes import (
+    analytics,
+    auth,
+    broker,
+    deployment,
+    execution,
+    market,
+    options,
+    share,
+    strategies,
+)
 from backend.api.ws import router as ws_router
 from backend.broker import accounts
 from backend.broker.neo_auth import session_manager
@@ -170,6 +180,8 @@ app.include_router(strategies.router)
 app.include_router(execution.router)
 app.include_router(analytics.router)
 app.include_router(share.router)
+app.include_router(deployment.router)
+app.include_router(deployment.callback_router)
 app.include_router(ws_router)
 
 
@@ -183,8 +195,13 @@ def root() -> dict[str, Any]:
         "data_source": "angel_one",
         "execution_brokers": broker_registry.enabled_brokers(),
         "default_execution_broker": settings.default_execution_broker,
+        "static_ip": settings.registered_static_ip or None,
+        "redirect_url": settings.redirect_url or None,
+        "redirect_path": settings.redirect_path,
         "docs": "/docs",
         "health": "/api/v1/system/health",
+        "deployment": "/api/v1/system/deployment",
+        "callback": settings.redirect_path,
         "share": "/api/v1/share",
         "share_qr": "/api/v1/share/qr.png",
         "auth": "/api/v1/auth/login",
@@ -214,6 +231,12 @@ def health() -> dict[str, Any]:
         "angel_instruments": angel_instruments.status(),
         "quotes": quote_engine.health(),
         "angel_session": angel_session_health(),
+        "deployment": {
+            "static_ip": settings.registered_static_ip or None,
+            "redirect_url": settings.redirect_url or None,
+            "redirect_path": settings.redirect_path,
+            "report": "/api/v1/system/deployment",
+        },
         "sessions": {
             "registry": "ready",
             "kotak": "configured" if accounts.list_accounts("kotak") else "unconfigured",

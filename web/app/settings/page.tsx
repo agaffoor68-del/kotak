@@ -1,10 +1,10 @@
 "use client";
 
-/** Settings: system health, users, API keys and deployment diagnostics. */
+/** Settings: system health, users, API keys and deployment (static IP + redirect). */
 
 import { useCallback, useEffect, useState } from "react";
 import { api, getApiBase, loadToken } from "@/lib/api";
-import type { User } from "@/lib/api";
+import type { DeploymentReport, User } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { AppShell } from "@/components/app-shell";
 import { ErrorNote, Field, Loading, Panel, StatusChip } from "@/components/ui";
@@ -13,11 +13,182 @@ import { clock, num, relative } from "@/lib/format";
 interface Health {
   status: string;
   environment: string;
-  broker: string;
+  data_source?: string;
+  execution_brokers?: string[];
+  deployment?: {
+    static_ip: string | null;
+    redirect_url: string | null;
+    redirect_path: string;
+  };
   features: Record<string, boolean>;
   feed: { status: string; frames_received: number; reconnects: number; subscribed_instruments: number; last_error: string | null; cached_quotes: number };
   scrip_master: { status: string; instruments: number; last_sync: number | null; last_error: string | null; stale: boolean };
   quotes: { cached_quotes: number; last_error: string | null };
+}
+
+/** Copy-to-clipboard row: the value a user must paste into a broker portal. */
+function CopyRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-hairline px-3 py-2">
+      <p className="label-caps">{label}</p>
+      <div className="mt-1 flex items-center gap-2">
+        <code className="min-w-0 flex-1 break-all font-mono text-2xs text-ink">{value}</code>
+        <button className="btn btn-sm btn-ghost shrink-0" onClick={() => void copy()} type="button">
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      {hint ? <p className="mt-1 text-3xs leading-relaxed text-ink-faint">{hint}</p> : null}
+    </div>
+  );
+}
+
+function DeploymentPanel() {
+  const [report, setReport] = useState<DeploymentReport | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setReport(await api.deployment());
+      setError(null);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not read the deployment report");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function refresh() {
+    setBusy(true);
+    setError(null);
+    try {
+      setReport(await api.refreshDeployment());
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not re-detect the public IP");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const ip = report?.static_ip;
+  const ipTone =
+    ip?.status === "verified" ? "live" : ip?.status === "mismatch" ? "error" : "warn";
+
+  return (
+    <Panel
+      title="Deployment: static IP & redirect URL"
+      subtitle="Register these with the broker before enabling live order APIs (SEBI)"
+      actions={
+        <button className="btn btn-sm btn-ghost" onClick={() => void refresh()} disabled={busy} type="button">
+          {busy ? "Re-detecting…" : "Re-detect IP"}
+        </button>
+      }
+    >
+      {error ? <ErrorNote error={error} onRetry={() => void load()} /> : null}
+      {!report && !error ? <Loading label="Reading the deployment report" /> : null}
+
+      {report ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusChip
+              status={report.ready_for_live ? "live" : "warn"}
+              label={report.ready_for_live ? "Ready for live order APIs" : "Not ready for live orders"}
+            />
+            {ip ? <StatusChip status={ipTone} label={`static IP ${ip.status}`} /> : null}
+            <span className="text-3xs text-ink-faint">{report.environment}</span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CopyRow
+              label="Public IP (register on the broker portal)"
+              value={ip?.detected_ip ?? ip?.registered_ip ?? "not detected"}
+              hint={
+                ip?.detected_ip && ip?.registered_ip && ip.detected_ip !== ip.registered_ip
+                  ? `Recorded as ${ip.registered_ip}, which no longer matches — orders will be rejected.`
+                  : "This is the address the host egresses from right now."
+              }
+            />
+            <CopyRow
+              label="Redirect URL (production)"
+              value={report.redirect.production}
+              hint={
+                report.redirect.configured
+                  ? "Paste this into the broker's redirect/callback field."
+                  : "Derived from the request — set PUBLIC_URL or REDIRECT_URL to pin it."
+              }
+            />
+            <CopyRow
+              label="Redirect URL (development)"
+              value={report.redirect.development}
+              hint="For a broker that also accepts a loopback callback."
+            />
+            <div className="rounded-md border border-hairline px-3 py-2">
+              <p className="label-caps">Local (private) address</p>
+              <code className="mt-1 block font-mono text-2xs text-ink-dim">
+                {ip?.private_address ?? "unknown"}
+              </code>
+              <p className="mt-1 text-3xs leading-relaxed text-ink-faint">
+                {ip?.detection_source === "override"
+                  ? "From PUBLIC_IP_OVERRIDE."
+                  : ip?.detection_source === "disabled"
+                    ? "Detection is off (PUBLIC_IP_CHECK=0)."
+                    : "Detected from the egress path."}
+              </p>
+            </div>
+          </div>
+
+          {ip?.message ? (
+            <p
+              className={`rounded-md border px-3 py-2 text-2xs ${
+                ip.status === "verified"
+                  ? "border-up/40 bg-up/10 text-up"
+                  : ip.status === "mismatch"
+                    ? "border-down/40 bg-down/10 text-down"
+                    : "border-warn/40 bg-warn-soft text-warn"
+              }`}
+            >
+              {ip.message}
+            </p>
+          ) : null}
+
+          <div>
+            <p className="label-caps mb-2">Compliance checklist</p>
+            <ul className="space-y-1.5">
+              {report.checklist.map((item) => (
+                <li key={item.id} className="flex items-start gap-2 text-2xs">
+                  <span className={item.ok ? "text-up" : "text-down"} aria-hidden>
+                    {item.ok ? "✓" : "✕"}
+                  </span>
+                  <span className="min-w-0">
+                    <span className={item.ok ? "text-ink-dim" : "text-ink"}>{item.label}</span>
+                    {!item.ok ? (
+                      <span className="mt-0.5 block text-3xs leading-relaxed text-ink-faint">{item.detail}</span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <p className="border-t border-hairline pt-3 text-3xs leading-relaxed text-ink-faint">{ip?.note}</p>
+        </div>
+      ) : null}
+    </Panel>
+  );
 }
 
 function Settings() {
@@ -90,9 +261,13 @@ function Settings() {
               <p className="mt-0.5 text-3xs text-ink-faint">{health.environment}</p>
             </div>
             <div className="panel px-4 py-3">
-              <p className="label-caps">Broker</p>
-              <p className="mt-1.5 text-sm font-semibold">{health.broker}</p>
-              <p className="mt-0.5 text-3xs text-ink-faint">exclusive</p>
+              <p className="label-caps">Data source</p>
+              <p className="mt-1.5 text-sm font-semibold">
+                {health.data_source === "angel_one" ? "Angel One" : health.data_source ?? "—"}
+              </p>
+              <p className="mt-0.5 text-3xs text-ink-faint">
+                execution: {(health.execution_brokers ?? []).join(" + ") || "—"}
+              </p>
             </div>
             <div className="panel px-4 py-3">
               <p className="label-caps">Feed</p>
@@ -237,11 +412,13 @@ function Settings() {
         </Panel>
       ) : null}
 
+      {user?.role === "admin" || user?.role === "trader" ? <DeploymentPanel /> : null}
+
       <Panel title="Deployment">
         <p className="text-2xs leading-relaxed text-ink-faint">
           See <code className="text-ink-dim">DEPLOY.md</code> in the repository for Docker, systemd and nginx
-          setup, the environment variables each feature needs, and the reverse-proxy configuration that keeps
-          the API off the public internet.
+          setup, the static IP and redirect URL steps a broker needs, the environment variables each feature
+          needs, and the reverse-proxy configuration that keeps the API off the public internet.
         </p>
         <button className="btn btn-ghost mt-3" onClick={signOut} type="button">
           Sign out of this device

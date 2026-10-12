@@ -22,6 +22,119 @@ codebase; `neo_auth.py` exists to make it impossible to repeat.
 > Running a single always-on cloud VM? See [CLOUD.md](CLOUD.md) — it wires the
 > same three services into a reboot-surviving stack with a watchdog and backups.
 
+---
+
+## Static IP and redirect URL (required before live orders)
+
+Two deployment facts must be registered with a broker before it will accept live orders. Both are
+surfaced in **Settings → Deployment**, with copy buttons and a pass/fail checklist, so nothing has
+to be hunted down in a shell.
+
+### 1. A static public IP
+
+SEBI requires the broker to see a **fixed source IP** on order APIs. A plain VM address does not
+survive a stop/start or a redeploy, so attach a real one first:
+
+| Provider | Product | Notes |
+| --- | --- | --- |
+| AWS | **Elastic IP** | Free while attached to a running instance |
+| DigitalOcean | **Reserved IP** | Attach to the droplet; survives rebuilds |
+| GCP | **Static external IP** | Reserve it, then assign to the instance |
+| Azure | **Static public IP** | Set the allocation method to *Static* |
+| Hetzner | **Primary IP** | Static by default |
+
+Then record it so the platform can watch for drift:
+
+```sh
+STATIC_IP=203.0.113.10          # the address registered on the broker portal
+STATIC_IP_RESERVED=1            # it is a real Elastic/Reserved IP
+```
+
+On a host that cannot reach a public "what is my IP" service, state the address directly and skip
+the lookup:
+
+```sh
+PUBLIC_IP_OVERRIDE=203.0.113.10
+PUBLIC_IP_CHECK=0
+```
+
+**Why record it at all?** Because the failure mode is silent otherwise. If the instance is rebuilt
+onto a dynamic address, the broker starts rejecting every order with an IP error while the platform
+looks perfectly healthy. With `STATIC_IP` set, **Settings → Deployment** reports `static IP mismatch`
+and names both addresses the moment they diverge.
+
+Verify from the API:
+
+```sh
+curl -s -H "Authorization: Bearer $TOKEN" \
+     https://trade.example.com/api/v1/system/deployment | jq '.static_ip'
+```
+
+```json
+{
+  "registered_ip": "203.0.113.10",
+  "detected_ip": "203.0.113.10",
+  "status": "verified",
+  "reserved": true
+}
+```
+
+`status` is one of `verified`, `mismatch`, `unregistered` or `unknown`. A private address is never
+reported as public — if detection cannot reach the internet, `detected_ip` is `null` and
+`detection_error` says why.
+
+### 2. A redirect URL
+
+Broker OAuth / API authorisation flows send the user back to a URL that must be **pre-registered**
+and **publicly resolvable**. The platform serves one at `/callback`:
+
+| Environment | URL |
+| --- | --- |
+| Production | `https://mywebsite.com/callback` |
+| Development | `http://127.0.0.1:8000/callback` |
+
+Configure it either by letting it derive from the public URL:
+
+```sh
+PUBLIC_URL=https://trade.example.com
+REDIRECT_PATH=/callback            # default
+```
+
+…or by pinning it explicitly, which is what to do when the broker needs one exact string:
+
+```sh
+REDIRECT_URL=https://trade.example.com/callback
+REQUIRE_HTTPS=1                    # reject a redirect that arrives over plain HTTP
+```
+
+If a broker also accepts a loopback callback for local testing, list it so it is not refused:
+
+```sh
+REDIRECT_ALLOWLIST=https://trade.example.com/callback,http://127.0.0.1:8000/callback
+```
+
+The endpoint answers a bare `GET /callback` with a plain 200 (so you can prove it resolves), and
+forwards a broker's `?code=…&state=…` into the terminal's `/connect` page.
+
+> **Security.** `/callback` is unauthenticated by necessity — the broker is the caller. It
+> therefore validates any `next` target against `REDIRECT_ALLOWLIST` (or the site's own origin) and
+> returns **400** for anything else, so it cannot be used as an open redirect.
+
+### Checklist
+
+**Settings → Deployment** shows the same list, live:
+
+- [ ] `STATIC_IP` set to the address registered on the broker portal
+- [ ] `STATIC_IP_RESERVED=1` (the address survives a stop/start)
+- [ ] The detected IP matches the registered one
+- [ ] `PUBLIC_URL` or `REDIRECT_URL` set
+- [ ] The redirect URL is HTTPS
+- [ ] `REQUIRE_HTTPS=1`
+
+`ready_for_live` in `GET /api/v1/system/deployment` is true only when all of them pass.
+
+---
+
 ## Option A — Docker Compose
 
 ```sh
@@ -219,6 +332,8 @@ is reported as `skipped`, never as `sent`.
 ## Before you go live
 
 * [ ] A **valid** Kotak consumer key, verified via `/api/v1/session`
+* [ ] A **static IP** attached and registered with the broker (see above)
+* [ ] The **redirect URL** registered, over HTTPS
 * [ ] Authentication in front of nginx (Cloudflare Access, Tailscale, or basic auth)
 * [ ] TLS, with HSTS
 * [ ] Risk limits reviewed and set deliberately
@@ -242,3 +357,6 @@ is reported as `skipped`, never as `sent`.
 | `VaultLocked` when saving an account | `CREDENTIAL_ENCRYPTION_KEY` not set | Set it; the vault never falls back to plaintext |
 | Live order returns 403 `DISABLED` | Feature gate off | `ENABLE_LIVE_TRADING=1`, then restart |
 | Live order returns `POSITION_SIZE` | Risk limit | Real — the engine blocked it. Review the limit, not the code |
+| Broker rejects orders with an IP error | Egress IP no longer matches the registered one | Check **Settings → Deployment**; re-attach the Elastic/Reserved IP or update `STATIC_IP` |
+| Deployment panel shows `static IP unregistered` | `STATIC_IP` never set | Register the detected IP with the broker, then set `STATIC_IP` to it |
+| `/callback` returns 400 | `next` not in `REDIRECT_ALLOWLIST` | Add the target explicitly, or drop the `next` parameter |

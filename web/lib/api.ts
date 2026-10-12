@@ -687,6 +687,11 @@ export const api = {
     const query = params.toString();
     return get<ShareResponse>(`/api/v1/share${query ? `?${query}` : ""}`);
   },
+
+  // deployment: static IP + redirect URL (SEBI compliance)
+  deployment: (refresh = false) =>
+    get<DeploymentReport>(`/api/v1/system/deployment${refresh ? "?refresh=true" : ""}`),
+  refreshDeployment: () => post<DeploymentReport>("/api/v1/system/deployment/refresh"),
 };
 
 /* ------------------------------------------------------- broker connection */
@@ -833,6 +838,50 @@ export interface BrokerNetworkResponse {
   };
   hosts: BrokerNetworkHost[];
   note: string;
+}
+
+/* ------------------------------------------------------- deployment facts */
+
+/** Static IP + redirect URL: what a broker must be told before live orders. */
+export interface StaticIpReport {
+  registered_ip: string | null;
+  detected_ip: string | null;
+  detection_source: "override" | "remote" | "disabled" | "unavailable";
+  detection_error: string | null;
+  checked_at: number;
+  reserved: boolean;
+  status: "verified" | "mismatch" | "unregistered" | "unknown";
+  message: string;
+  private_address: string | null;
+  request_origin: string | null;
+  note: string;
+}
+
+export interface RedirectReport {
+  path: string;
+  production: string;
+  development: string;
+  allowlist: string[];
+  scheme: string;
+  host: string;
+  https: boolean;
+  configured: boolean;
+}
+
+export interface DeploymentCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface DeploymentReport {
+  static_ip: StaticIpReport;
+  redirect: RedirectReport;
+  checklist: DeploymentCheck[];
+  ready_for_live: boolean;
+  environment: string;
+  generated_at: number;
 }
 
 export interface ShareResponse {
