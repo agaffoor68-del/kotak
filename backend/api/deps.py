@@ -107,18 +107,35 @@ async def require_admin(user: CurrentUser = Depends(current_user)) -> CurrentUse
 
 
 def resolve_account_id(user: CurrentUser, requested: str | None = None) -> str:
-    """Pick the account to act on, refusing cross-account access."""
+    """Pick the account to act on, refusing cross-account access.
+
+    An admin may address any account. Everyone else gets their own, and falls
+    back to the single environment-configured account only when the deployment
+    has no stored broker accounts at all — otherwise "the default account"
+    would hand any signed-in user the first account somebody else connected.
+    """
+    if not user.is_admin:
+        account_id = requested or user.account_id
+        if account_id:
+            if account_id == user.account_id:
+                return account_id
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "You do not have access to that account")
+        if not accounts.list_accounts():
+            fallback = accounts.default_account_id()
+            if fallback:
+                return fallback
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "No Kotak account is connected to your profile. Add your credentials on the Connect broker page.",
+        )
+
     account_id = requested or user.account_id or accounts.default_account_id()
     if not account_id:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "No Kotak account is configured. Add credentials, or set the KOTAK_* environment variables.",
         )
-    if user.is_admin or user.account_id == account_id:
-        return account_id
-    if accounts.default_account_id() == account_id:
-        return account_id
-    raise HTTPException(status.HTTP_403_FORBIDDEN, "You do not have access to that account")
+    return account_id
 
 
 def broker_call(account_id: str) -> Callable[..., Any]:

@@ -232,6 +232,27 @@ class NeoSessionManager:
         payload.update({"authenticated": True, "status": "live", "last_error": self._last_error.get(account_id)})
         return payload
 
+    def probe(self, credentials: BrokerCredentials) -> dict[str, Any]:
+        """Log in once, outside the session pool, to verify credentials.
+
+        The connect-broker panel needs Kotak's own message (bad consumer key,
+        bad MPIN, ...) straight back to the caller. It deliberately skips the
+        retry/backoff of `_establish` and never touches a session another
+        account may already be using.
+        """
+        started = time.time()
+        try:
+            session = self._authenticate(credentials)
+        except NeoAuthError as error:
+            return {"ok": False, "error": str(error), "seconds": round(time.time() - started, 2)}
+        except Exception as error:  # noqa: BLE001 - a transport failure must not become a 500
+            return {"ok": False, "error": f"{type(error).__name__}: {error}", "seconds": round(time.time() - started, 2)}
+        try:
+            session.client.logout()
+        except Exception:  # noqa: BLE001 - the throwaway session is not worth retrying
+            pass
+        return {"ok": True, "error": None, "seconds": round(time.time() - started, 2), "state": session.state}
+
     def keepalive(self, resolver) -> None:
         """Background loop that keeps every known account logged in."""
         while True:

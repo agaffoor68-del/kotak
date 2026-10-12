@@ -49,6 +49,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "System",
     items: [
+      { href: "/connect", label: "Broker connect", icon: "⇄" },
       { href: "/alerts", label: "Alerts", icon: "◔" },
       { href: "/settings", label: "Settings", icon: "⚒" },
     ],

@@ -618,7 +618,22 @@ export const api = {
     post<Record<string, unknown>>(`/api/v1/algo/runs?strategy_id=${strategyId}&mode=${mode}`),
   stopAlgo: (runId: string) => post<Record<string, unknown>>(`/api/v1/algo/runs/${runId}/stop`),
   riskEvents: (limit = 50) => get<RiskEventRow[]>(`/api/v1/risk/events?limit=${limit}`),
-  reconnect: () => post<Record<string, unknown>>("/api/v1/session/reconnect"),
+  // The header's reconnect button; scoped to the account the caller owns.
+  reconnect: () => post<Record<string, unknown>>("/api/v1/broker/session/reconnect"),
+
+  // broker connection panel
+  brokerAccounts: () => get<BrokerAccountsResponse>("/api/v1/broker/accounts"),
+  brokerSession: () => get<BrokerAccountView>("/api/v1/broker/session"),
+  brokerNetwork: () => get<BrokerNetworkResponse>("/api/v1/broker/network"),
+  brokerTest: (body: BrokerCredentialsInput) => post<BrokerTestResult>("/api/v1/broker/test", body),
+  brokerConnect: (body: BrokerCredentialsInput & { label?: string; test_before_save?: boolean }) =>
+    post<BrokerConnectResponse>("/api/v1/broker/accounts", body),
+  brokerTestSaved: (accountId: string) =>
+    post<BrokerTestResult>(`/api/v1/broker/accounts/${encodeURIComponent(accountId)}/test`),
+  brokerReconnect: (accountId: string) =>
+    post<BrokerAccountView>(`/api/v1/broker/accounts/${encodeURIComponent(accountId)}/reconnect`),
+  brokerDisconnect: (accountId: string) =>
+    del<{ removed: boolean; account_id: string }>(`/api/v1/broker/accounts/${encodeURIComponent(accountId)}`),
 
   // analytics
   performance: () => get<PerformancePayload>("/api/v1/analytics/performance"),
@@ -649,6 +664,107 @@ export const api = {
     return get<ShareResponse>(`/api/v1/share${query ? `?${query}` : ""}`);
   },
 };
+
+/* ------------------------------------------------------- broker connection */
+
+/** Exactly what the connect form collects. Secrets never round-trip back. */
+export interface BrokerCredentialsInput {
+  consumer_key: string;
+  totp_key: string;
+  mpin: string;
+  mobile_number: string;
+  ucc: string;
+  neo_fin_key?: string | null;
+  environment: "prod" | "uat";
+}
+
+export interface BrokerSessionHealth {
+  account_id: string | null;
+  authenticated: boolean;
+  status: string;
+  last_error?: string | null;
+  age_seconds?: number;
+  expires_in_seconds?: number;
+  configured?: boolean;
+}
+
+export interface BrokerAccountView {
+  account_id: string | null;
+  label?: string;
+  environment?: string;
+  configured?: boolean;
+  is_active?: number;
+  created_at?: number;
+  updated_at?: number;
+  session: BrokerSessionHealth;
+  status?: string;
+  message?: string;
+}
+
+export interface BrokerAccountsResponse {
+  is_admin: boolean;
+  accounts: {
+    account_id: string;
+    label: string;
+    environment: string;
+    created_at: number;
+    updated_at: number;
+    session: BrokerSessionHealth;
+  }[];
+  default_account_id: string | null;
+  vault_enabled: boolean;
+  legacy_env_fallback: boolean;
+}
+
+export interface BrokerTestResult {
+  ok: boolean;
+  error: string | null;
+  seconds: number;
+  state?: Record<string, unknown>;
+}
+
+export interface BrokerConnectResponse {
+  account: BrokerAccountView;
+  /** Redacted view: consumer key shown as `••••xxxx`, secrets never echoed. */
+  masked: Record<string, string>;
+  verified: boolean;
+  bound_to_user: string;
+}
+
+export interface BrokerAddressProbe {
+  address: string;
+  family: "ipv4" | "ipv6";
+  reachable: boolean;
+  latency_ms: number | null;
+  error: string | null;
+}
+
+export interface BrokerNetworkHost {
+  label: string;
+  host: string;
+  required: boolean;
+  dns_error: string | null;
+  ipv4: string[];
+  ipv6: string[];
+  results: BrokerAddressProbe[];
+}
+
+export interface BrokerNetworkResponse {
+  checked_at: number;
+  verdict: "dual_stack" | "ipv4_only" | "ipv6_unreachable" | "degraded" | "unreachable";
+  hosts_down: string[];
+  required_hosts_down: string[];
+  summary: {
+    ipv4_resolved: number;
+    ipv4_reachable: number;
+    ipv6_resolved: number;
+    ipv6_reachable: number;
+    timeout_seconds: number;
+    local_ipv6: boolean;
+  };
+  hosts: BrokerNetworkHost[];
+  note: string;
+}
 
 export interface ShareResponse {
   base_url: string;
