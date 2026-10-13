@@ -54,6 +54,11 @@ DEFAULT_TIMEOUT = 30.0
 #: A SmartAPI access token is documented as valid for ~24h; refresh well inside.
 JWT_REFRESH_SECONDS = 55 * 60
 KEEPALIVE_SECONDS = 15 * 60
+#: SmartAPI intermittently answers 200 with an empty/non-JSON body when it is
+#: under load (market open). Those replies are retried this many extra times,
+#: pausing this long between tries, before the error is surfaced.
+BLANK_BODY_RETRIES = 2
+BLANK_BODY_BACKOFF_SECONDS = 0.75
 
 
 class AngelAuthError(RuntimeError):
@@ -95,6 +100,32 @@ def _describe_non_json(response: requests.Response) -> str:
         f"SmartAPI returned a non-JSON body (HTTP {response.status_code}, "
         f"content-type {content_type}); {detail}"
     )
+
+
+def _is_transient_blank(response: requests.Response) -> bool:
+    """Is this the flaky "HTTP 200 but no JSON" reply that is worth retrying?
+
+    SmartAPI intermittently returns ``200`` with an empty or truncated body
+    around market open (09:15–11:00 IST) while its backend is under load. Unlike
+    a WAF rejection — which is also ``200`` but ``text/html`` and says "Request
+    Rejected" — this is genuinely transient, so a short retry clears it.
+
+    A reply only qualifies when the body carries *no* usable JSON: either it is
+    empty, or it is JSON that fails to parse. A ``text/html`` "Request Rejected"
+    page is excluded by name so a real, permanent rejection is never retried.
+    """
+    if response.status_code != 200:
+        return False
+    body = (response.text or "").strip()
+    if not body:
+        return True
+    if "request rejected" in body[:400].lower():
+        return False
+    try:
+        json.loads(body)
+    except ValueError:
+        return True
+    return False
 
 
 def _local_ip() -> str:
@@ -340,17 +371,30 @@ class AngelSessionManager:
                     raise AngelAuthError(f"No credentials available for Angel account {account_id}")
                 session = self.get(account_id, credentials)
                 url = f"{base_url(session.cred.environment)}{path}"
-                try:
-                    response = requests.request(
-                        http_method.upper(),
-                        url,
-                        headers=session.headers(),
-                        params=params,
-                        json=payload,
-                        timeout=DEFAULT_TIMEOUT,
-                    )
-                except requests.RequestException as error:
-                    raise AngelAuthError(f"SmartAPI {method} transport failed: {error}") from error
+                response = None
+                for blank_attempt in range(BLANK_BODY_RETRIES + 1):
+                    try:
+                        response = requests.request(
+                            http_method.upper(),
+                            url,
+                            headers=session.headers(),
+                            params=params,
+                            json=payload,
+                            timeout=DEFAULT_TIMEOUT,
+                        )
+                    except requests.RequestException as error:
+                        raise AngelAuthError(f"SmartAPI {method} transport failed: {error}") from error
+
+                    # A 200 with an empty/unparseable body is the flaky market-open
+                    # reply; retry it rather than surfacing a phantom failure.
+                    if blank_attempt < BLANK_BODY_RETRIES and _is_transient_blank(response):
+                        log.warning(
+                            "SmartAPI %s returned a blank/non-JSON body; retry %s/%s in %.2fs",
+                            method, blank_attempt + 1, BLANK_BODY_RETRIES, BLANK_BODY_BACKOFF_SECONDS,
+                        )
+                        time.sleep(BLANK_BODY_BACKOFF_SECONDS)
+                        continue
+                    break
 
                 if response.status_code in (401, 403) or not response.ok:
                     text = response.text[:200]
