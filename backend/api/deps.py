@@ -189,11 +189,14 @@ def angel_call(user: CurrentUser | None = None, account_id: str | None = None) -
     """
     from backend.angel.auth import AngelAuthError, angel_session_manager
 
+    # Market data belongs to whichever Angel account exists, never to the
+    # caller's Kotak account. A requested/account-bound id is only honoured when
+    # it really is an Angel account; anything else (e.g. a Kotak UCC) is dropped
+    # in favour of the resolved Angel account so we raise the accurate
+    # "no Angel account configured" error instead of a per-account one.
     target = account_id or (user.account_id if user and user.account_id else None)
-    if target == "" or target is None:
+    if not target or accounts.broker_of(target) != accounts.ANGEL:
         target = resolve_angel_account_id()
-    elif accounts.broker_of(target) != accounts.ANGEL:
-        target = resolve_angel_account_id() or target
 
     if not target:
         raise HTTPException(

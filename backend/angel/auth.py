@@ -76,6 +76,27 @@ def _explode(message: str) -> bool:
     )
 
 
+def _describe_non_json(response: requests.Response) -> str:
+    """Explain a SmartAPI reply that was not JSON, with enough to act on.
+
+    Angel's edge answers some rejections (a bad ``X-PrivateKey``, a WAF block)
+    with ``HTTP 200`` and a non-JSON body — commonly ``text/html`` and empty. That
+    used to collapse into a bare "non-JSON body", which hid the real cause and
+    also defeated the token-expiry heuristic in :meth:`AngelSessionManager.call`.
+    Surface the status, the content type and a snippet of the body instead.
+    """
+    content_type = (response.headers.get("content-type") or "unknown").split(";")[0].strip()
+    body = (response.text or "").strip()
+    if not body:
+        detail = "the body was empty"
+    else:
+        detail = f"the body began with {body[:120]!r}"
+    return (
+        f"SmartAPI returned a non-JSON body (HTTP {response.status_code}, "
+        f"content-type {content_type}); {detail}"
+    )
+
+
 def _local_ip() -> str:
     """Best-effort private address, as SmartAPI wants it in a header."""
     try:
@@ -189,9 +210,9 @@ class AngelSessionManager:
         try:
             payload = response.json()
         except ValueError:
-            raise AngelAuthError(f"SmartAPI returned a non-JSON body (HTTP {response.status_code})") from None
+            raise AngelAuthError(_describe_non_json(response)) from None
         if not isinstance(payload, dict):
-            raise AngelAuthError("SmartAPI returned an unexpected payload")
+            raise AngelAuthError(f"SmartAPI returned an unexpected payload: {str(payload)[:200]}")
         if payload.get("status") is False or payload.get("success") is False:
             message = payload.get("message") or payload.get("errorcode") or "SmartAPI rejected the request"
             raise AngelAuthError(str(message))
