@@ -16,6 +16,24 @@ from backend.core.vault import AngelCredentials
 
 log = logging.getLogger("alphatrade.api")
 
+
+def _env_angel_credentials(account_id: str | None) -> AngelCredentials | None:
+    """The Angel credentials described by the environment, if any.
+
+    The market-data feed resolves an account id from the environment when no
+    Angel row exists in the database (see :func:`resolve_angel_account_id`), so
+    the credential lookup has to honour the same fallback or the feed is handed
+    an id whose credentials can never be found.
+    """
+    if not account_id:
+        return None
+    credentials = AngelCredentials.from_environment()
+    if credentials is None:
+        return None
+    if account_id in (credentials.client_code, accounts.ANGEL):
+        return credentials
+    return None
+
 #: Role hierarchy. Higher roles include the permissions of the lower ones.
 ROLE_LEVEL = {"viewer": 1, "trader": 2, "admin": 3}
 
@@ -207,6 +225,12 @@ def angel_call(user: CurrentUser | None = None, account_id: str | None = None) -
         )
 
     credentials = accounts.get_credentials(target)
+    if not isinstance(credentials, AngelCredentials):
+        # ``get_credentials`` only reaches the environment fallback when the
+        # legacy single-account path is enabled. The feed, however, always
+        # resolves its account id from the environment when no row is stored,
+        # so read the env credentials here as well instead of failing the feed.
+        credentials = _env_angel_credentials(target)
     if not isinstance(credentials, AngelCredentials):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,

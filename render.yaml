@@ -50,6 +50,27 @@ services:
         value: 1
       - key: KOTAK_KEEPALIVE_SECONDS
         value: 300
+      # Angel One SmartAPI credentials - REQUIRED for market data.
+      # Set the real values in the Render dashboard (Environment tab); they are
+      # deliberately not committed. Without these the market-data feed cannot
+      # build a session bridge and logs "has no Angel One credentials".
+      # Create the API key at SmartAPI -> My Apps (smartapi.angelone.in).
+      - key: ANGEL_API_KEY
+        sync: false
+      - key: ANGEL_CLIENT_CODE
+        sync: false
+      - key: ANGEL_PIN
+        sync: false
+      - key: ANGEL_TOTP_KEY
+        sync: false
+      - key: ANGEL_ENVIRONMENT
+        value: prod
+      - key: ANGEL_SESSION_TTL_SECONDS
+        value: 28800
+      - key: ANGEL_RATE_LIMIT_PER_SECOND
+        value: 3
+      - key: ANGEL_MAX_TOKENS_PER_CALL
+        value: 50
       - key: FEED_POLL_SECONDS
         value: 1
       - key: RECORD_TICKS
