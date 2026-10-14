@@ -207,6 +207,7 @@ class AngelSession:
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AlphaTrade/1.0",
             "X-UserType": "USER",
             "X-SourceID": "WEB",
             "X-ClientLocalIP": _local_ip(),
@@ -308,6 +309,7 @@ class AngelSessionManager:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AlphaTrade/1.0",
             "X-UserType": "USER",
             "X-SourceID": "WEB",
             "X-ClientLocalIP": _local_ip(),
@@ -360,7 +362,7 @@ class AngelSessionManager:
         if not session.refresh_token:
             raise AngelSessionExpired("No refresh token; a full login is required")
         url = f"{base_url(session.cred.environment)}{REFRESH_PATH}"
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "X-PrivateKey": session.cred.api_key}
+        headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AlphaTrade/1.0", "X-PrivateKey": session.cred.api_key}
         try:
             response = _send_with_blank_retry(
                 lambda: requests.post(
