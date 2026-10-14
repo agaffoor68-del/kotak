@@ -140,13 +140,25 @@ class AngelCredentials:
     environment: str = "prod"
 
     def __post_init__(self) -> None:
+        # Values copied from Angel's portal or an authenticator often contain
+        # surrounding whitespace; TOTP seeds may also be displayed in groups.
+        # Normalise them before SmartAPI signs the login request so the generated
+        # code is based on the actual base32 secret, not its presentation format.
+        self.api_key = str(self.api_key or "").strip()
+        self.client_code = str(self.client_code or "").strip().upper()
+        self.pin = str(self.pin or "").strip()
+        self.totp_key = "".join(str(self.totp_key or "").split()).replace("-", "").upper()
+        self.environment = str(self.environment or "prod").strip().lower()
+
         missing = [
             name
             for name in ("api_key", "client_code", "pin", "totp_key")
-            if not str(getattr(self, name) or "").strip()
+            if not getattr(self, name)
         ]
         if missing:
             raise ValueError("Missing Angel One credentials: " + ", ".join(missing))
+        if self.environment not in {"prod", "uat"}:
+            raise ValueError("Angel environment must be 'prod' or 'uat'")
 
     def to_ciphertext(self) -> str:
         import json

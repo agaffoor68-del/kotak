@@ -36,6 +36,19 @@ import requests
 from backend.core.config import settings
 from backend.core.vault import AngelCredentials
 
+
+def _public_ip() -> str:
+    """Return the host's real egress IP for SmartAPI's required header."""
+    try:
+        from backend.deployment import detect_public_ip
+
+        detected = detect_public_ip().get("ip")
+        if detected:
+            return str(detected)
+    except Exception:  # noqa: BLE001 - header generation must remain best-effort
+        log.debug("Could not detect public egress IP", exc_info=True)
+    return _local_ip()
+
 log = logging.getLogger("alphatrade.angel")
 
 #: SmartAPI REST bases. Angel serves one prod host; `uat` is for sandbox keys.
@@ -197,7 +210,7 @@ class AngelSession:
             "X-UserType": "USER",
             "X-SourceID": "WEB",
             "X-ClientLocalIP": _local_ip(),
-            "X-ClientPublicIP": _local_ip(),
+            "X-ClientPublicIP": _public_ip(),
             "X-MACAddress": "00:00:00:00:00:00",
             "X-PrivateKey": self.cred.api_key,
         }
@@ -298,7 +311,7 @@ class AngelSessionManager:
             "X-UserType": "USER",
             "X-SourceID": "WEB",
             "X-ClientLocalIP": _local_ip(),
-            "X-ClientPublicIP": _local_ip(),
+            "X-ClientPublicIP": _public_ip(),
             "X-MACAddress": "00:00:00:00:00:00",
             "X-PrivateKey": credentials.api_key,
         }
