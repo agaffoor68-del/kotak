@@ -37,6 +37,7 @@ from backend.broker import accounts
 from backend.broker.neo_auth import session_manager
 from backend.core.config import settings
 from backend.marketdata import master
+from backend.marketdata.feed import market_feed
 
 log = logging.getLogger("alphatrade")
 
@@ -70,8 +71,9 @@ async def lifespan(app: FastAPI):
 
     # Background services. The Kotak keepalive keeps Neo logged in for order
     # execution; the Angel keepalive keeps the market-data session fresh; the
-    # Angel feed records the tape and fans quotes out to the dashboard.
-    # Neither may kill the boot: without credentials they log and idle, and
+    # Angel feed records the tape and fans quotes out to the dashboard; the
+    # Kotak feed streams HSM ticks (websocket) into the same quote cache.
+    # None may kill the boot: without credentials they log and idle, and
     # Render's health check must still pass so the cause is visible in logs.
     try:
         session_manager.start_keepalive(_credential_resolver)
@@ -85,10 +87,18 @@ async def lifespan(app: FastAPI):
         angel_feed.start(_angel_feed_resolver)
     except Exception:  # noqa: BLE001
         log.exception("Angel market feed failed to start; continuing without it")
+    try:
+        market_feed.start()
+    except Exception:  # noqa: BLE001
+        log.exception("Kotak Neo websocket feed failed to start; continuing without it")
 
     yield
 
     log.info("Shutting down AlphaTradePro")
+    try:
+        market_feed.stop()
+    except Exception:  # noqa: BLE001
+        log.exception("Error stopping the Kotak Neo websocket feed")
     try:
         angel_feed.stop()
     except Exception:  # noqa: BLE001
@@ -227,6 +237,7 @@ def health() -> dict[str, Any]:
         "data_source": "angel_one",
         "execution_brokers": broker_registry.enabled_brokers(),
         "feed": angel_feed.health(),
+        "kotak_websocket_feed": market_feed.health(),
         "scrip_master": master.status(),
         "angel_instruments": angel_instruments.status(),
         "quotes": quote_engine.health(),

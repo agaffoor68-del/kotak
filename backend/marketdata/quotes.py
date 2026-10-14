@@ -83,28 +83,31 @@ class Quote:
 # ------------------------------------------------------------- Neo field names
 
 #: Neo returns abbreviated keys depending on the endpoint. Both forms map here.
+#: Each tuple also lists the *canonical* attribute name first, so rows that were
+#: already normalised by the WebSocket feed (backend.marketdata.feed) round-trip
+#: through quote_from_row without losing values.
 FIELD_ALIASES: dict[str, tuple[str, ...]] = {
-    "last": ("last_traded_price", "ltp", "last_price", "lp", "lastPrice"),
-    "open": ("open", "op", "open_price"),
-    "high": ("high", "hi", "high_price"),
-    "low": ("low", "lo", "low_price"),
-    "previous_close": ("previous_close", "prev_day_close", "pc", "prevClose"),
-    "change": ("net_chg", "change", "chg", "netChange"),
-    "change_percent": ("percentage_change", "p_change", "net_chg_percent", "pChange", "changePercent"),
+    "last": ("last", "last_traded_price", "ltp", "last_price", "lp", "lastPrice"),
+    "open": ("open", "op", "open_price", "openingPrice"),
+    "high": ("high", "hi", "high_price", "highPrice"),
+    "low": ("low", "lo", "low_price", "lowPrice"),
+    "previous_close": ("previous_close", "prev_day_close", "pc", "prevClose", "close", "ic"),
+    "change": ("change", "net_chg", "chg", "netChange", "cng"),
+    "change_percent": ("change_percent", "percentage_change", "p_change", "net_chg_percent", "pChange", "changePercent", "nc"),
     "volume": ("volume", "vol", "total_traded_volume", "totTradedVol"),
     "open_interest": ("open_interest", "oi", "openInterest", "totOI"),
-    "bid": ("bid_price", "bidprice", "best_bid", "bid"),
-    "ask": ("ask_price", "askprice", "best_ask", "ask"),
-    "bid_quantity": ("bid_quantity", "bidqty", "bidQty"),
-    "ask_quantity": ("ask_quantity", "askqty", "askQty"),
+    "bid": ("bid", "bid_price", "bidprice", "best_bid", "bp"),
+    "ask": ("ask", "ask_price", "askprice", "best_ask", "sp"),
+    "bid_quantity": ("bid_quantity", "bidqty", "bidQty", "bq"),
+    "ask_quantity": ("ask_quantity", "askqty", "askQty", "sq", "bs"),
     "implied_volatility": ("implied_volatility", "iv", "impliedVolatility"),
-    "upper_circuit": ("upper_circuit", "upper_circ", "uc"),
-    "lower_circuit": ("lower_circuit", "lower_circ", "lc"),
-    "week52_high": ("week_52_high", "52_week_high", "w52h"),
-    "week52_low": ("week_52_low", "52_week_low", "w52l"),
+    "upper_circuit": ("upper_circuit", "upper_circ", "uc", "ucl"),
+    "lower_circuit": ("lower_circuit", "lower_circ", "lc", "lcl"),
+    "week52_high": ("week52_high", "week_52_high", "52_week_high", "w52h", "yh"),
+    "week52_low": ("week52_low", "week_52_low", "52_week_low", "w52l", "yl"),
     "average_price": ("average_price", "avg_price", "ap"),
-    "total_buy_quantity": ("total_buy_quantity", "totalBuyQty"),
-    "total_sell_quantity": ("total_sell_quantity", "totalSellQty"),
+    "total_buy_quantity": ("total_buy_quantity", "totalBuyQty", "tbq"),
+    "total_sell_quantity": ("total_sell_quantity", "totalSellQty", "tsq"),
     "last_traded_quantity": ("last_traded_quantity", "lastTradedQty", "ltq"),
 }
 

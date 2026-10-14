@@ -44,24 +44,47 @@ def _number(value: Any) -> float | None:
 
 
 #: Kotak pushes short keys in some modes; map them onto the canonical names.
+#: Keys are exactly the HSM wire names from neo_api_client.settings
+#: (stock_key_mapping) and HSWebSocketLib SCRIP_MAPPING.
 SOCKET_FIELD_MAP = {
-    "lp": "last", "ltp": "last", "last_price": "last",
-    "o": "open", "op": "open",
-    "h": "high", "hi": "high", "high_price": "high",
-    "l": "low", "lo": "low", "low_price": "low",
-    "c": "close", "cl": "close", "prev_close": "previous_close", "pc": "previous_close",
+    "ltp": "last", "lp": "last", "last_price": "last",
+    "o": "open", "op": "open", "openingPrice": "open",
+    "h": "high", "hi": "high", "high_price": "high", "highPrice": "high",
+    "l": "low", "lo": "low", "low_price": "low", "lowPrice": "low",
+    "c": "previous_close", "cl": "previous_close", "ic": "previous_close",
+    "prev_close": "previous_close", "pc": "previous_close",
     "v": "volume", "vol": "volume", "tot_traded_vol": "volume",
     "oi": "open_interest", "tot_oi": "open_interest",
-    "bid": "bid", "ask": "ask", "bidprice": "bid", "askprice": "ask",
-    "bidqty": "bid_quantity", "askqty": "ask_quantity",
-    "iv": "implied_volatility", "implied_volatility": "implied_volatility",
+    "bp": "bid", "bid": "bid", "bidprice": "bid",
+    "sp": "ask", "ask": "ask", "askprice": "ask",
+    "bq": "bid_quantity", "bidqty": "bid_quantity",
+    "sq": "ask_quantity", "askqty": "ask_quantity", "bs": "ask_quantity",
+    "iv": "implied_volatility",
     "ap": "average_price", "avg_price": "average_price",
-    "uc": "upper_circuit", "lc": "lower_circuit",
-    "w52h": "week52_high", "w52l": "week52_low",
-    "nb": "total_buy_quantity", "ns": "total_sell_quantity",
-    "pchange": "change_percent", "change_percent": "change_percent",
+    "uc": "upper_circuit", "ucl": "upper_circuit",
+    "lc": "lower_circuit", "lcl": "lower_circuit",
+    "w52h": "week52_high", "yh": "week52_high",
+    "w52l": "week52_low", "yl": "week52_low",
+    "nb": "total_buy_quantity", "tbq": "total_buy_quantity",
+    "ns": "total_sell_quantity", "tsq": "total_sell_quantity",
+    "cng": "change", "change": "change",
+    "nc": "change_percent", "pchange": "change_percent",
     "ltq": "last_traded_quantity",
+    "vwap": "average_price",
 }
+
+#: Index frames (INDEX_MAPPING) carry a completely different key set: `iv` is
+#: the index LTP — not implied volatility — and `ic` the previous close.
+INDEX_FIELD_MAP = {
+    "iv": "last", "ic": "previous_close", "c": "previous_close",
+    "openingPrice": "open", "highPrice": "high", "lowPrice": "low",
+    "cng": "change", "nc": "change_percent",
+}
+
+
+def _is_index_frame(frame: SocketFrame) -> bool:
+    """Index rows have `iv`/`ic` and no `ltp`; scrip rows are the opposite."""
+    return "ltp" not in frame and ("iv" in frame or "ic" in frame or "openingPrice" in frame)
 
 
 def normalise_frame(frame: SocketFrame) -> SocketFrame | None:
@@ -69,20 +92,33 @@ def normalise_frame(frame: SocketFrame) -> SocketFrame | None:
     token = str(frame.get("tk") or frame.get("token") or frame.get("instrument_token") or "").strip()
     if not token:
         return None
-    segment = str(frame.get("exch_seg") or frame.get("exchange_segment") or "nse_cm").strip().lower()
+    segment = str(
+        frame.get("e") or frame.get("exch_seg") or frame.get("exchange_segment") or "nse_cm"
+    ).strip().lower()
+    if segment in {"nse", "nscm", "nsespot"}:
+        segment = "nse_cm"
+    elif segment in {"bse", "bscm"}:
+        segment = "bse_cm"
 
+    field_map = INDEX_FIELD_MAP if _is_index_frame(frame) else SOCKET_FIELD_MAP
     out: SocketFrame = {"token": token, "exchange_segment": segment}
     for key, value in frame.items():
-        canonical = SOCKET_FIELD_MAP.get(key)
+        canonical = field_map.get(key)
         if canonical and out.get(canonical) is None:
             number = _number(value)
             if number is not None:
                 out[canonical] = number
     if "last" not in out:
         return None
-    if "exchange_segment" in frame:
-        out["exchange_segment"] = str(frame["exchange_segment"]).strip().lower()
     return out
+
+
+def _bare(instruments: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Strip our bookkeeping flags down to the SDK's expected payload."""
+    return [
+        {"instrument_token": item["instrument_token"], "exchange_segment": item["exchange_segment"]}
+        for item in instruments
+    ]
 
 
 class FeedState:
@@ -127,41 +163,76 @@ class MarketFeed:
         self._loop: asyncio.AbstractEventLoop | None = None
 
     # -- subscription bookkeeping ---------------------------------------
-    def subscribe(self, instruments: list[dict[str, str]]) -> list[dict[str, str]]:
-        added: list[dict[str, str]] = []
+    def subscribe(self, instruments: list[dict[str, Any]]) -> list[dict[str, str]]:
+        added: list[dict[str, Any]] = []
         with self._lock:
             for instrument in instruments:
                 token = str(instrument.get("instrument_token") or instrument.get("token") or "").strip()
                 if not token:
                     continue
                 segment = str(instrument.get("exchange_segment") or "nse_cm").strip().lower()
+                # Indices must be subscribed with the index request type (ifs),
+                # otherwise Kotak rejects the scrip as unknown.
+                is_index = bool(instrument.get("is_index")) or token in self._is_index
                 if token in self._subscriptions:
                     continue
                 self._subscriptions[token] = {"exchange_segment": segment}
-                added.append({"instrument_token": token, "exchange_segment": segment})
+                self._is_index[token] = is_index
+                added.append({"instrument_token": token, "exchange_segment": segment, "is_index": is_index})
         if added and self._client is not None:
             try:
-                self._client.subscribe(instrument_tokens=added, isIndex=False, isDepth=False)
-                self._push_socket_subscribe(added)
+                self._push_subscribes(added)
             except Exception as error:  # noqa: BLE001
                 log.warning("Neo subscribe failed: %s", error)
         self.state.subscribed = len(self._subscriptions)
-        return added
+        return [
+            {"instrument_token": item["instrument_token"], "exchange_segment": item["exchange_segment"]}
+            for item in added
+        ]
 
-    def unsubscribe(self, tokens: list[str]) -> list[str]:
-        removed = []
+    def unsubscribe(self, tokens: list[str]) -> list[dict[str, str]]:
+        removed: list[dict[str, Any]] = []
         with self._lock:
             for token in tokens:
                 entry = self._subscriptions.pop(str(token), None)
+                is_index = self._is_index.pop(str(token), False)
                 if entry:
-                    removed.append({"instrument_token": str(token), "exchange_segment": entry["exchange_segment"]})
+                    removed.append({
+                        "instrument_token": str(token),
+                        "exchange_segment": entry["exchange_segment"],
+                        "is_index": is_index,
+                    })
         if removed and self._client is not None:
             try:
-                self._client.un_subscribe(instrument_tokens=removed, isIndex=False, isDepth=False)
+                self._push_unsubscribes(removed)
             except Exception as error:  # noqa: BLE001
                 log.warning("Neo unsubscribe failed: %s", error)
         self.state.subscribed = len(self._subscriptions)
-        return removed
+        return [
+            {"instrument_token": item["instrument_token"], "exchange_segment": item["exchange_segment"]}
+            for item in removed
+        ]
+
+    def _push_subscribes(self, instruments: list[dict[str, Any]]) -> None:
+        """Subscribe scrips and indices in separate calls (the SDK takes one flag per call)."""
+        if self._client is None:
+            return
+        scrips = [i for i in instruments if not i.get("is_index")]
+        indices = [i for i in instruments if i.get("is_index")]
+        if scrips:
+            self._client.subscribe(instrument_tokens=_bare(scrips), isIndex=False, isDepth=False)
+        if indices:
+            self._client.subscribe(instrument_tokens=_bare(indices), isIndex=True, isDepth=False)
+
+    def _push_unsubscribes(self, instruments: list[dict[str, Any]]) -> None:
+        if self._client is None:
+            return
+        scrips = [i for i in instruments if not i.get("is_index")]
+        indices = [i for i in instruments if i.get("is_index")]
+        if scrips:
+            self._client.un_subscribe(instrument_tokens=_bare(scrips), isIndex=False, isDepth=False)
+        if indices:
+            self._client.un_subscribe(instrument_tokens=_bare(indices), isIndex=True, isDepth=False)
 
     def subscription_tokens(self) -> list[str]:
         with self._lock:
@@ -247,37 +318,31 @@ class MarketFeed:
         client.on_close = lambda message: self._note_error(f"socket closed: {message}")
         client.on_open = lambda message: log.info("Neo socket open: %s", message)
 
+        self._client = client
         # Neo's socket is opened by subscribe(); re-subscribe what we already track.
         pending = self._rebuild_subscriptions()
         if pending:
-            client.subscribe(instrument_tokens=pending, isIndex=False, isDepth=False)
-        # A no-op subscribe opens the connection even with an empty watchlist.
-        if not pending:
-            client.subscribe(instrument_tokens=[{"instrument_token": "26000", "exchange_segment": "nse_cm"}],
-                             isIndex=True, isDepth=False)
+            self._push_subscribes(pending)
+        else:
+            # A no-op subscribe opens the connection even with an empty watchlist.
+            client.subscribe(
+                instrument_tokens=[{"instrument_token": "26000", "exchange_segment": "nse_cm"}],
+                isIndex=True, isDepth=False,
+            )
 
-        self._client = client
         self.state.status = "connected"
         self.state.account_id = account_id
         self.state.connected_at = time.time()
         self.state.last_error = None
 
-    def _push_socket_subscribe(self, instruments: list[dict[str, str]]) -> None:
-        """Also register with the raw socket, which is what actually streams."""
-        if self._client is None:
-            return
-        socket = getattr(self._client, "neo_api", None) or getattr(self._client, "_NeoAPI__neo_api", None)
-        if socket is None:
-            return
-        try:
-            socket.subscribe.subscribe_feed(instruments, False, False)
-        except Exception as error:  # noqa: BLE001
-            log.debug("Raw socket subscribe skipped: %s", error)
-
-    def _rebuild_subscriptions(self) -> list[dict[str, str]]:
+    def _rebuild_subscriptions(self) -> list[dict[str, Any]]:
         with self._lock:
             return [
-                {"instrument_token": token, "exchange_segment": entry["exchange_segment"]}
+                {
+                    "instrument_token": token,
+                    "exchange_segment": entry["exchange_segment"],
+                    "is_index": self._is_index.get(token, False),
+                }
                 for token, entry in self._subscriptions.items()
             ]
 
