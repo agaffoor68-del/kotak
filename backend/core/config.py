@@ -88,6 +88,51 @@ class Settings:
         self.angel_history_days_default = _int("ANGEL_HISTORY_DAYS_DEFAULT", 30)
         self.angel_history_days_max = _int("ANGEL_HISTORY_DAYS_MAX", 1800)
 
+        # --- market data provider ----------------------------------------
+        # Which broker serves market data (quotes, LTP, candles, live feed).
+        # Read-only by design: no provider in this setting places orders.
+        self.market_data_provider = os.getenv("MARKET_DATA_PROVIDER", "fyers").strip().lower()
+
+        # --- FYERS API v3 (market data) -----------------------------------
+        # Credentials come from the environment (or the encrypted store), never
+        # from code. Create the app at https://myapi.fyers.in/dashboard/ and
+        # register the Render callback as its redirect URI.
+        self.fyers_app_id = os.getenv("FYERS_APP_ID", "").strip()
+        self.fyers_secret_id = os.getenv("FYERS_SECRET_ID", "").strip()
+        #: Falls back to PUBLIC_URL + FYERS_REDIRECT_PATH when empty.
+        self.fyers_redirect_uri = os.getenv("FYERS_REDIRECT_URI", "").strip()
+        self.fyers_redirect_path = os.getenv("FYERS_REDIRECT_PATH", "/fyers/callback").strip() or "/fyers/callback"
+        #: Optional: enables the refresh-token path (15-day validity). FYERS
+        #: documents this flow as possibly being discontinued, so a missing or
+        #: rejected refresh simply asks the operator to visit /fyers/login.
+        self.fyers_pin = os.getenv("FYERS_PIN", "").strip()
+        #: Operator override for a token minted elsewhere; the encrypted file
+        #: store wins once /fyers/callback has run.
+        self.fyers_access_token_env = os.getenv("FYERS_ACCESS_TOKEN", "").strip()
+        self.fyers_token_file = os.getenv(
+            "FYERS_TOKEN_FILE", os.path.join(self.data_dir, "fyers_token.json")
+        )
+        #: Rate limit and batching for the FYERS data API (quotes cap at 50).
+        self.fyers_rate_limit_per_second = _float("FYERS_RATE_LIMIT_PER_SECOND", 3.0)
+        self.fyers_max_symbols_per_call = _int("FYERS_MAX_SYMBOLS_PER_CALL", 50)
+        #: Every data call retries transient failures this many extra times
+        #: with exponential backoff before surfacing the error.
+        self.fyers_retries = _int("FYERS_RETRIES", 3)
+        self.fyers_retry_backoff_seconds = _float("FYERS_RETRY_BACKOFF_SECONDS", 0.5)
+        self.fyers_history_days_default = _int("FYERS_HISTORY_DAYS_DEFAULT", 30)
+        self.fyers_history_days_max = _int("FYERS_HISTORY_DAYS_MAX", 1800)
+        #: Live feed behaviour: REST priming/fallback cadence (seconds).
+        self.fyers_poll_seconds_open = _float("FYERS_POLL_SECONDS_OPEN", 1.0)
+        self.fyers_poll_seconds_closed = _float("FYERS_POLL_SECONDS_CLOSED", 60.0)
+        #: Recycle the socket when the feed has been silent this long in-session.
+        self.fyers_socket_stale_seconds = _int("FYERS_SOCKET_STALE_SECONDS", 180)
+        #: Download + cache FYERS' public symbol master for validation.
+        self.fyers_symbol_master_url = os.getenv(
+            "FYERS_SYMBOL_MASTER_URL", "https://public.fyers.in/sym_details/{}.json"
+        )
+        self.fyers_symbol_master_ttl = _int("FYERS_SYMBOL_MASTER_TTL", 12 * 60 * 60)
+
+
         # --- execution routing -------------------------------------------
         # Which broker receives an order when the caller does not name one.
         # "kotak", "angel" or "both" (fan the same signal out to both).
