@@ -67,12 +67,34 @@ DEFAULT_TIMEOUT = 30.0
 #: A SmartAPI access token is documented as valid for ~24h; refresh well inside.
 JWT_REFRESH_SECONDS = 55 * 60
 KEEPALIVE_SECONDS = 15 * 60
-#: SmartAPI intermittently answers 200 with an empty/non-JSON body when it is
-#: under load (market open). Every request path — login, refresh, profile and
-#: secured calls — retries those replies this many extra times, pausing this
-#: long between tries, before the error is surfaced.
-BLANK_BODY_RETRIES = 2
-BLANK_BODY_BACKOFF_SECONDS = 0.75
+#: SmartAPI can answer 200 with an empty/non-JSON body or an HTML WAF page.
+#: Every request path retries the initial request plus three delayed attempts.
+BLANK_BODY_RETRIES = 3
+BLANK_BODY_BACKOFF_SECONDS = 2.0
+
+
+def _proxy_kwargs() -> dict[str, Any]:
+    """Use an explicit proxy when configured; requests otherwise honors env vars."""
+    proxy_url = os.getenv("ANGEL_PROXY_URL", "").strip()
+    if not proxy_url:
+        return {}
+    return {"proxies": {"http": proxy_url, "https": proxy_url}}
+
+
+def _common_headers(private_key: str | None = None) -> dict[str, str]:
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-UserType": "USER",
+        "X-SourceID": "WEB",
+        "X-ClientPublicIP": "200.141.10.11",
+        "X-ClientLocalIP": "127.0.0.1",
+        "X-MACAddress": "00:1A:2B:3C:4D:5E",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    }
+    if private_key:
+        headers["X-PrivateKey"] = private_key
+    return headers
 
 
 class AngelAuthError(RuntimeError):
@@ -123,22 +145,18 @@ def _describe_non_json(response: requests.Response) -> str:
 def _is_transient_blank(response: requests.Response) -> bool:
     """Is this the flaky "HTTP 200 but no JSON" reply that is worth retrying?
 
-    SmartAPI intermittently returns ``200`` with an empty or truncated body
-    around market open (09:15–11:00 IST) while its backend is under load. Unlike
-    a WAF rejection — which is also ``200`` but ``text/html`` and says "Request
-    Rejected" — this is genuinely transient, so a short retry clears it.
-
-    A reply only qualifies when the body carries *no* usable JSON: either it is
-    empty, or it is JSON that fails to parse. A ``text/html`` "Request Rejected"
-    page is excluded by name so a real, permanent rejection is never retried.
+    Angel's WAF can return ``200`` with an HTML page instead of JSON. Empty,
+    HTML, and otherwise unparseable 200 replies are retried because the caller
+    explicitly requested recovery from this edge response.
     """
     if response.status_code != 200:
         return False
     body = (response.text or "").strip()
     if not body:
         return True
-    if "request rejected" in body[:400].lower():
-        return False
+    content_type = (response.headers.get("content-type") or "").lower()
+    if "html" in content_type or "<html" in body[:400].lower():
+        return True
     try:
         json.loads(body)
     except ValueError:
@@ -148,12 +166,9 @@ def _is_transient_blank(response: requests.Response) -> bool:
 
 def _send_with_blank_retry(send: Callable[[], requests.Response], label: str) -> requests.Response:
     """Run one SmartAPI request, retrying the flaky "200 but no JSON" reply.
-
-    Shared by login, refresh, profile and secured calls so every path treats a
-    transient blank body the same way (see :func:`_is_transient_blank`). A
-    non-transient reply — a WAF rejection page, a 4xx/5xx — comes straight
-    back on the first attempt and is never retried. The final response is
+    Shared by login, refresh, profile and secured calls. The final response is
     returned as-is so the caller can build the descriptive error.
+
     """
     response = send()
     for attempt in range(BLANK_BODY_RETRIES):
@@ -306,20 +321,10 @@ class AngelSessionManager:
             "password": credentials.pin,
             "totp": pyotp.TOTP(credentials.totp_key).now(),
         }
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AlphaTrade/1.0",
-            "X-UserType": "USER",
-            "X-SourceID": "WEB",
-            "X-ClientLocalIP": _local_ip(),
-            "X-ClientPublicIP": _public_ip(),
-            "X-MACAddress": "00:00:00:00:00:00",
-            "X-PrivateKey": credentials.api_key,
-        }
+        headers = _common_headers(credentials.api_key)
         try:
             response = _send_with_blank_retry(
-                lambda: requests.post(url, json=body, headers=headers, timeout=DEFAULT_TIMEOUT),
+                lambda: requests.post(url, json=body, headers=headers, timeout=DEFAULT_TIMEOUT, **_proxy_kwargs()),
                 "login",
             )
         except requests.RequestException as error:
@@ -349,6 +354,7 @@ class AngelSessionManager:
                     f"{base_url(session.cred.environment)}{PROFILE_PATH}",
                     headers=session.headers(),
                     timeout=DEFAULT_TIMEOUT,
+                    **_proxy_kwargs(),
                 ),
                 "profile",
             )
@@ -362,11 +368,12 @@ class AngelSessionManager:
         if not session.refresh_token:
             raise AngelSessionExpired("No refresh token; a full login is required")
         url = f"{base_url(session.cred.environment)}{REFRESH_PATH}"
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AlphaTrade/1.0", "X-PrivateKey": session.cred.api_key}
+        headers = _common_headers(session.cred.api_key)
         try:
             response = _send_with_blank_retry(
-                lambda: requests.post(
-                    url, json={"refreshToken": session.refresh_token}, headers=headers, timeout=DEFAULT_TIMEOUT
+                    lambda: requests.post(
+                    url, json={"refreshToken": session.refresh_token}, headers=headers, timeout=DEFAULT_TIMEOUT,
+                    **_proxy_kwargs(),
                 ),
                 "refresh",
             )
@@ -433,6 +440,7 @@ class AngelSessionManager:
                             params=params,
                             json=payload,
                             timeout=DEFAULT_TIMEOUT,
+                            **_proxy_kwargs(),
                         ),
                         method,
                     )
