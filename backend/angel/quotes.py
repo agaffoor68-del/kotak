@@ -29,7 +29,7 @@ from . import instruments
 log = logging.getLogger("alphatrade.angel.quotes")
 
 LTP_PATH = "/rest/secure/angelbroking/order/v1/getLTP"
-QUOTE_PATH = "/rest/secure/angelbroking/market/v1/quote"
+QUOTE_PATH = "/rest/secure/angelbroking/market/v1/quote/"
 
 #: The platform's quote_type -> SmartAPI's mode.
 MODE_MAP = {"ltp": "LTP", "ohlc": "OHLC", "all": "FULL", "full": "FULL"}
@@ -167,11 +167,22 @@ def fetch(
     # then send exactly one token in each FULL quote request.
     for single in resolved:
         _limiter.wait()
+        exchange = instruments.SEGMENT_EXCHANGE.get(single[2])
+        if exchange is None:
+            log.warning("Skipping unsupported Angel exchange segment: %s", single[2])
+            continue
+
+        # SmartAPI expects broker exchange codes (for example NSE), not the
+        # platform's database segment names (for example nse_cm). Keep this
+        # request deliberately single-token and FULL to match the quote API
+        # contract and avoid 400 responses from mixed/invalid payloads.
         payload = call(
             "quotes", QUOTE_PATH,
             payload={
                 "mode": "FULL",
-                "exchangeTokens": {single[2]: [single[0]]},
+                "exchangeTokens": {
+                    exchange: [single[0]],
+                },
             },
             http_method="POST",
         )
