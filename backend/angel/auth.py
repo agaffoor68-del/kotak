@@ -28,6 +28,7 @@ import os
 import socket
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -91,16 +92,22 @@ def _proxy_kwargs() -> dict[str, Any]:
     }
 
 
+def _mac_address() -> str:
+    """Return the host MAC in the format expected by SmartAPI."""
+    value = uuid.getnode()
+    return ":".join(f"{value >> shift & 0xff:02X}" for shift in range(40, -1, -8))
+
+
 def _common_headers(private_key: str | None = None) -> dict[str, str]:
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
         "X-UserType": "USER",
         "X-SourceID": "WEB",
-        "X-ClientPublicIP": "200.141.10.11",
-        "X-ClientLocalIP": "127.0.0.1",
-        "X-MACAddress": "00:1A:2B:3C:4D:5E",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "X-ClientPublicIP": settings.angel_client_public_ip or _public_ip(),
+        "X-ClientLocalIP": settings.angel_client_local_ip or _local_ip(),
+        "X-MACAddress": settings.angel_mac_address or _mac_address(),
+        "User-Agent": settings.angel_user_agent,
     }
     if private_key:
         headers["X-PrivateKey"] = private_key

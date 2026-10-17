@@ -72,6 +72,17 @@ class Settings:
         # SmartAPI. Credentials live in the encrypted store, these are the
         # non-secret knobs.
         self.angel_environment = os.getenv("ANGEL_ENVIRONMENT", "prod")
+        # SmartAPI edge headers are deployment-specific; never bake an IP or
+        # MAC address into the client. Leave the public IP empty to detect the
+        # current egress address, or set it when the deployment has a reserved IP.
+        self.angel_client_public_ip = os.getenv("ANGEL_CLIENT_PUBLIC_IP", "").strip()
+        self.angel_client_local_ip = os.getenv("ANGEL_CLIENT_LOCAL_IP", "").strip()
+        self.angel_mac_address = os.getenv("ANGEL_MAC_ADDRESS", "").strip()
+        self.angel_user_agent = os.getenv(
+            "ANGEL_USER_AGENT",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        ).strip()
         self.angel_session_ttl_seconds = _int("ANGEL_SESSION_TTL_SECONDS", 8 * 60 * 60)
         self.angel_session_file = os.getenv("ANGEL_SESSION_FILE", os.path.join(self.data_dir, "angel_session.json"))
         self.angel_instrument_file = os.getenv(
