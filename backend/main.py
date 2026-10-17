@@ -144,14 +144,20 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# CORS: the deployed Vercel frontend must be explicitly allowed. In production
+# the origin list is fixed (no regex), so a missing origin shows up as a browser
+# "Failed to fetch" / CORS error with no backend traceback.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
-    allow_origin_regex=settings.allowed_origin_regex,
+    allow_origins=[
+        "https://kotak-jade.vercel.app",  # deployed Vercel frontend
+        "http://localhost:3000",          # local dev
+        "http://127.0.0.1:3000",          # local dev
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-QR-Payload"],
+    expose_headers=["X-QR-Payload"],  # required by api/routes/share.py QR download
 )
 
 
