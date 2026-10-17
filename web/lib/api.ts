@@ -51,9 +51,14 @@ export async function ensureApiBase(): Promise<string> {
 
   for (const candidate of candidates) {
     try {
+      // A same-origin probe answers in milliseconds; the cross-origin backend may
+      // be a free-tier host that is asleep and needs 15-50s to wake, so the
+      // budget here is deliberately generous. `request()` below uses a plain
+      // fetch with no timeout, so once this probe succeeds the real calls ride
+      // the now-warm instance.
       const response = await fetch(`${candidate}/api/v1/system/health`, {
         cache: "no-store",
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(25000),
       });
       if (response.ok) {
         resolvedBase = candidate;
