@@ -58,10 +58,10 @@ FIELD_ALIASES: dict[str, tuple[str, ...]] = {
 
 
 class _RateLimiter:
-    """A minimal token bucket so we never spam SmartAPI past its limit."""
+    """Enforce SmartAPI's one quote request per second limit."""
 
-    def __init__(self, per_second: int) -> None:
-        self._interval = 1.0 / max(1, per_second)
+    def __init__(self) -> None:
+        self._interval = 1.0
         self._lock = threading.Lock()
         self._next = 0.0
 
@@ -74,7 +74,7 @@ class _RateLimiter:
             self._next = now + self._interval
 
 
-_limiter = _RateLimiter(settings.angel_rate_limit_per_second)
+_limiter = _RateLimiter()
 
 
 def _number(value: Any) -> float | None:
@@ -158,17 +158,21 @@ def fetch(
     """Fetch a live snapshot for `(token, exchange_segment)` pairs."""
     if not keys:
         return []
-    mode = MODE_MAP.get(str(quote_type).lower(), "FULL")
     resolved = instruments.to_smartapi(keys)
     if not resolved:
         raise QuoteError("None of the requested instruments are in the Angel One master. Sync it first.")
 
     quotes: list[Quote] = []
-    for batch in _chunks(resolved, max(1, settings.angel_max_tokens_per_call)):
+    # Resolve tokens from the current OpenAPIScripMaster-backed instrument table,
+    # then send exactly one token in each FULL quote request.
+    for single in resolved:
         _limiter.wait()
         payload = call(
             "quotes", QUOTE_PATH,
-            payload={"mode": mode, "exchangeTokens": _exchange_tokens(batch)},
+            payload={
+                "mode": "FULL",
+                "exchangeTokens": {single[2]: [single[0]]},
+            },
             http_method="POST",
         )
         rows = _extract_rows(payload)
@@ -179,7 +183,7 @@ def fetch(
             token = row.get("symbolToken") or row.get("symbol_token")
             symbol = str(row.get("tradingSymbol") or row.get("symbol") or "")
             # The response is keyed by symbol, not token; resolve back.
-            match = _match(batch, token, symbol)
+            match = _match([single], token, symbol)
             if match is None:
                 continue
             quote = quote_from_row(row, match[0], match[2])
