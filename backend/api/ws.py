@@ -14,9 +14,9 @@ from typing import Any
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
+from backend.angel.feed import angel_feed
 from backend.core.security import decode_access_token
 from backend.marketdata import market_hours, master
-from backend.marketdata.feed import market_feed
 
 log = logging.getLogger("alphatrade.ws")
 
@@ -50,8 +50,8 @@ async def market_stream(websocket: WebSocket, token: str | None = Query(default=
 
     await websocket.accept()
     queue: asyncio.Queue = asyncio.Queue(maxsize=512)
-    unregister = market_feed.register(queue)
-    market_feed.bind_loop(asyncio.get_running_loop())
+    unregister = angel_feed.register(queue)
+    angel_feed.bind_loop(asyncio.get_running_loop())
 
     async def pump() -> None:
         """Forward broker ticks to this client."""
@@ -63,7 +63,7 @@ async def market_stream(websocket: WebSocket, token: str | None = Query(default=
                 await websocket.send_json({
                     "type": "heartbeat",
                     "session": market_hours.session_state(),
-                    "feed": market_feed.health(),
+                    "feed": angel_feed.health(),
                     "at": time.time(),
                 })
                 continue
@@ -75,18 +75,18 @@ async def market_stream(websocket: WebSocket, token: str | None = Query(default=
             action = message.get("action")
 
             if action == "subscribe":
-                added = market_feed.subscribe(message.get("tokens") or [])
+                added = angel_feed.subscribe(message.get("tokens") or [])
                 await websocket.send_json({
                     "type": "subscribed", "added": added,
-                    "total": len(market_feed.subscription_tokens()),
+                    "total": len(angel_feed.subscription_tokens()),
                 })
             elif action == "unsubscribe":
-                removed = market_feed.unsubscribe(message.get("tokens") or [])
+                removed = angel_feed.unsubscribe(message.get("tokens") or [])
                 await websocket.send_json({"type": "unsubscribed", "removed": removed})
             elif action == "status":
                 await websocket.send_json({
                     "type": "status", "session": market_hours.session_state(),
-                    "feed": market_feed.health(), "scrip_master": master.status(),
+                    "feed": angel_feed.health(), "scrip_master": master.status(),
                 })
             elif action == "ping":
                 await websocket.send_json({"type": "pong"})
