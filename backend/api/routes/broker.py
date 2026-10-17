@@ -240,20 +240,38 @@ def test_account(account_id: str, user: CurrentUser = Depends(require_trader)) -
     return session_manager.probe(credentials)
 
 
-@router.post("/accounts/{account_id}/reconnect")
-def reconnect_account(account_id: str, user: CurrentUser = Depends(require_trader)) -> dict[str, Any]:
-    """Drop the cached session and log in again with the stored credentials."""
-    if account_id not in _owned_account_ids(user):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "You do not have access to that account")
-    credentials = accounts.get_credentials(account_id)
-    if credentials is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No credentials stored for account '{account_id}'.")
+def _reconnect_account(account_id: str, credentials: BrokerCredentials | AngelCredentials) -> dict[str, Any]:
+    """Reconnect through the account's declared broker and matching credential type."""
+    broker = accounts.broker_of(account_id)
+    if broker == accounts.ANGEL:
+        if not isinstance(credentials, AngelCredentials):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No Angel One credentials stored for '{account_id}'.")
+        angel_session_manager.invalidate(account_id)
+        try:
+            angel_session_manager.get(account_id, credentials)
+        except AngelAuthError as error:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+        return angel_session_health(account_id)
+
+    if not isinstance(credentials, BrokerCredentials):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No Kotak Neo credentials stored for '{account_id}'.")
     session_manager.invalidate(account_id)
     try:
         session_manager.get(account_id, credentials)
     except NeoAuthError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
     return session_health(account_id)
+
+
+@router.post("/accounts/{account_id}/reconnect")
+def reconnect_account(account_id: str, user: CurrentUser = Depends(require_trader)) -> dict[str, Any]:
+    """Drop the cached session and log in again with the stored broker credentials."""
+    if account_id not in _owned_account_ids(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You do not have access to that account")
+    credentials = accounts.get_credentials(account_id)
+    if credentials is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No credentials stored for account '{account_id}'.")
+    return _reconnect_account(account_id, credentials)
 
 
 
@@ -405,12 +423,7 @@ def reconnect_own(user: CurrentUser = Depends(require_trader)) -> dict[str, Any]
     credentials = accounts.get_credentials(account_id)
     if credentials is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"No credentials stored for account '{account_id}'.")
-    session_manager.invalidate(account_id)
-    try:
-        session_manager.get(account_id, credentials)
-    except NeoAuthError as error:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
-    return session_health(account_id)
+    return _reconnect_account(account_id, credentials)
 
 
 @router.get("/session")
