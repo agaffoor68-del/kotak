@@ -306,10 +306,14 @@ class MarketFeed:
     def _connect(self) -> None:
         from backend.broker.neo_auth import session_manager
 
-        account_id = accounts.default_account_id()
+        # Market data is provided by Kotak Neo; never let the global default
+        # resolve to an Angel account when both brokers are configured.
+        account_id = accounts.default_account_id("kotak")
         if account_id is None:
             raise NeoAuthError("No Kotak account is configured")
         credentials = accounts.get_credentials(account_id)
+        if not isinstance(credentials, accounts.BrokerCredentials):
+            raise NeoAuthError(f"Account {account_id} does not contain Kotak credentials")
         session = session_manager.get(account_id, credentials)
 
         client = session.client

@@ -16,7 +16,7 @@ from typing import Any
 from neo_api_client import NeoAPI
 
 from backend.core.config import settings
-from backend.core.vault import BrokerCredentials
+from backend.core.vault import AngelCredentials, BrokerCredentials
 
 log = logging.getLogger("alphatrade.neo")
 
@@ -111,6 +111,9 @@ class NeoSessionManager:
             return self._locks[account_id]
 
     def _authenticate(self, credentials: BrokerCredentials) -> NeoSession:
+        if not isinstance(credentials, BrokerCredentials):
+            broker_name = "Angel One" if isinstance(credentials, AngelCredentials) else type(credentials).__name__
+            raise NeoAuthError(f"Kotak Neo requires Kotak credentials, received {broker_name}")
         try:
             import pyotp
         except ImportError:  # pragma: no cover - declared in requirements
