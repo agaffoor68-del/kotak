@@ -74,11 +74,21 @@ BLANK_BODY_BACKOFF_SECONDS = 2.0
 
 
 def _proxy_kwargs() -> dict[str, Any]:
-    """Use an explicit proxy when configured; requests otherwise honors env vars."""
-    proxy_url = os.getenv("ANGEL_PROXY_URL", "").strip()
-    if not proxy_url:
+    """Pass the configured HTTP(S) proxies through to every SmartAPI request."""
+    http_proxy = os.getenv("HTTP_PROXY", "").strip()
+    https_proxy = os.getenv("HTTPS_PROXY", "").strip()
+    legacy_proxy = os.getenv("ANGEL_PROXY_URL", "").strip()
+    if legacy_proxy:
+        http_proxy = http_proxy or legacy_proxy
+        https_proxy = https_proxy or legacy_proxy
+    if not http_proxy and not https_proxy:
         return {}
-    return {"proxies": {"http": proxy_url, "https": proxy_url}}
+    return {
+        "proxies": {
+            "http": http_proxy or https_proxy,
+            "https": https_proxy or http_proxy,
+        }
+    }
 
 
 def _common_headers(private_key: str | None = None) -> dict[str, str]:
@@ -217,19 +227,12 @@ class AngelSession:
         return time.time() - self.refreshed_at
 
     def headers(self) -> dict[str, str]:
-        """The exact header set SmartAPI requires on a secured call."""
-        return {
+        """Return the required SmartAPI headers plus this session's credentials."""
+        headers = _common_headers(self.cred.api_key)
+        headers.update({
             "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AlphaTrade/1.0",
-            "X-UserType": "USER",
-            "X-SourceID": "WEB",
-            "X-ClientLocalIP": _local_ip(),
-            "X-ClientPublicIP": _public_ip(),
-            "X-MACAddress": "00:00:00:00:00:00",
-            "X-PrivateKey": self.cred.api_key,
-        }
+        })
+        return headers
 
     def status(self) -> dict[str, Any]:
         return {
