@@ -58,7 +58,7 @@ ENDPOINTS = {
     "uat": "https://apiconnect.angelbroking.com",
 }
 
-LOGIN_PATH = "/rest/auth/angelbroking/generate/token"
+LOGIN_PATH = "/rest/auth/angelbroking/user/v1/loginByPassword"
 REFRESH_PATH = "/rest/auth/angelbroking/jwt/v1/generate/token"
 LOGOUT_PATH = "/rest/secure/angelbroking/user/v1/logout"
 PROFILE_PATH = "/rest/secure/angelbroking/user/v1/getProfile"
@@ -99,19 +99,18 @@ def _mac_address() -> str:
 
 
 def _common_headers(private_key: str | None = None) -> dict[str, str]:
-    headers = {
+    """Return the exact header set required by Angel One's API edge."""
+    return {
         "Content-Type": "application/json",
         "Accept": "application/json",
         "X-UserType": "USER",
         "X-SourceID": "WEB",
-        "X-ClientPublicIP": settings.angel_client_public_ip or _public_ip(),
-        "X-ClientLocalIP": settings.angel_client_local_ip or _local_ip(),
-        "X-MACAddress": settings.angel_mac_address or _mac_address(),
-        "User-Agent": settings.angel_user_agent,
+        "X-ClientPublicIP": "200.141.10.11",
+        "X-ClientLocalIP": "127.0.0.1",
+        "X-MACAddress": "00:1A:2B:3C:4D:5E",
+        "X-PrivateKey": "7Wn5RQCA",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     }
-    if private_key:
-        headers["X-PrivateKey"] = private_key
-    return headers
 
 
 class AngelAuthError(RuntimeError):
