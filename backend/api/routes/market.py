@@ -17,6 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from backend.angel import breadth as angel_breadth
 from backend.angel import candles as angel_candles
 from backend.angel import instruments as angel_instruments
 from backend.angel.feed import angel_feed
@@ -224,29 +225,19 @@ def market_breadth(
     limit: int = Query(default=settings.breadth_universe_size, ge=10, le=1000),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
-    """Advance/decline breadth over a real universe of instruments."""
-    universe = angel_instruments.equity_universe("nse_cm", limit)
-    if not universe:
-        universe = master.universe("nse_cm", limit)
-    if not universe:
+    """Return the latest background-computed Advance/Decline snapshot."""
+    snapshot = angel_breadth.market_breadth_worker.snapshot()
+    if snapshot:
+        return snapshot
+    # On a cold start, populate synchronously once so the dashboard does not
+    # display a misleading 0.00 while the worker obtains its first snapshot.
+    snapshot = angel_breadth.market_breadth_worker.refresh_once()
+    if not snapshot:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            "No instruments in the master. Sync the Angel One instrument master first.",
+            "Market breadth is not ready. Ensure the Angel session and instrument master are available.",
         )
-    call = angel_call(user)
-    keys = [(item["token"], item["exchange_segment"]) for item in universe]
-    quotes = angel_fetch(call, keys, quote_type="ltp")
-
-    return {
-        "as_of": time.time(),
-        "source": "angel_one",
-        "universe_size": len(universe),
-        "priced": len([q for q in quotes if q.last is not None]),
-        "breadth": market_hours.breadth(quotes),
-        "top_gainers": market_hours.rank(quotes, limit=10, reverse=True),
-        "top_losers": market_hours.rank(quotes, limit=10, reverse=False),
-        "most_active": market_hours.most_active(quotes, limit=10),
-    }
+    return snapshot
 
 
 @router.get("/feed/subscribe")

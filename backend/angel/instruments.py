@@ -47,10 +47,21 @@ EXCHANGE_PREFIX = {
 #: The reverse map: the platform's segment name back to Angel's exchanger code.
 SEGMENT_EXCHANGE = {value: key for key, value in EXCHANGE_PREFIX.items()}
 
-#: Master token -> SmartAPI quote token for indices (Kotak Neo supplies
-#: different tokens for index quotes than for the instrument master).
+#: SmartAPI's numeric exchange types, used by its WebSocket protocol.
+#: REST quote requests use the corresponding ``SEGMENT_EXCHANGE`` code.
+SEGMENT_EXCHANGE_TYPE = {
+    "nse_cm": 1,
+    "nse_fo": 2,
+    "bse_cm": 3,
+    "bse_fo": 4,
+    "mcx_fo": 5,
+    "cde_fo": 6,
+}
+
+#: Canonical SmartAPI quote token for the BSE SENSEX index.
 INDEX_QUOTE_TOKEN: dict[str, str] = {
-    "265": "99919000",  # SENSEX (BSE)
+    "265": "99919000",      # legacy master token -> quote token
+    "99919000": "99919000", # canonical BSE index quote token
 }
 
 SYNC_INTERVAL_SECONDS = 12 * 60 * 60
@@ -170,7 +181,7 @@ KNOWN_INDICES: list[dict[str, Any]] = [
     {"token": "26009", "exchange_segment": "nse_cm", "symbol": "BANKNIFTY", "trading_symbol": "Nifty Bank", "name": "Nifty Bank", "is_index": 1},
     {"token": "26037", "exchange_segment": "nse_cm", "symbol": "FINNIFTY", "trading_symbol": "Nifty Fin Services", "name": "Nifty Fin Services", "is_index": 1},
     {"token": "26074", "exchange_segment": "nse_cm", "symbol": "MIDCPNIFTY", "trading_symbol": "NIFTY MID SELECT", "name": "NIFTY MID SELECT", "is_index": 1},
-    {"token": "265", "exchange_segment": "bse_cm", "symbol": "SENSEX", "trading_symbol": "SENSEX", "name": "S&P BSE SENSEX", "is_index": 1},
+    {"token": "99919000", "exchange_segment": "bse_cm", "symbol": "SENSEX", "trading_symbol": "SENSEX", "name": "S&P BSE SENSEX", "is_index": 1},
 ]
 
 
