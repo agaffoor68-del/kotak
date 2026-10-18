@@ -70,17 +70,7 @@ export function PriceChart({
     return () => observer.disconnect();
   }, []);
 
-const transformedCandles = useMemo(() => {
-  return candles.map(c => ({
-    timestamp: c.time ?? c.timestamp,
-    open: c.open,
-    high: c.high,
-    low: c.low,
-    close: c.close,
-    volume: c.volume,
-    trades: c.trades ?? 0
-  }));
-}, [candles]);
+  const series = useMemo(() => buildSeries(candles, style, renkoSize), [candles, style, renkoSize]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

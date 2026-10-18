@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickData, LineData, Time } from "lightweight-charts";
-import type { Candle } from "@/lib/api"; // Candle has: open, high, low, close, timestamp
+import { CandlestickSeries, createChart, ColorType, IChartApi, CandlestickData, LineData, LineSeries, Time } from "lightweight-charts";
+import type { Candle } from "@/lib/api";
 
 interface LightweightChartProps {
   candles: Candle[];
@@ -11,6 +11,8 @@ interface LightweightChartProps {
   showEMA50?: boolean;
   showVWAP?: boolean;
 }
+
+const chartTime = (time: number): Time => time as Time;
 
 function calculateEMA(candles: Candle[], period: number): LineData<Time>[] {
   if (candles.length < period) return [];
@@ -24,17 +26,15 @@ function calculateEMA(candles: Candle[], period: number): LineData<Time>[] {
   }
   let prevEMA = sum / period;
   
-  const parseTime = (t: string): Time => Math.floor(new Date(t).getTime() / 1000) as Time;
-  
   result.push({
-    time: parseTime(candles[period - 1].timestamp),
+    time: chartTime(candles[period - 1].time),
     value: prevEMA,
   });
 
   for (let i = period; i < candles.length; i++) {
     const currentEMA = (candles[i].close - prevEMA) * k + prevEMA;
     result.push({
-      time: parseTime(candles[i].timestamp),
+      time: chartTime(candles[i].time),
       value: currentEMA,
     });
     prevEMA = currentEMA;
@@ -46,15 +46,13 @@ function calculateVWAP(candles: Candle[]): LineData<Time>[] {
   let cumulativeTypicalVolume = 0;
   let cumulativeVolume = 0;
   const result: LineData<Time>[] = [];
-  const parseTime = (t: string): Time => Math.floor(new Date(t).getTime() / 1000) as Time;
-
   for (const c of candles) {
     const typicalPrice = (c.high + c.low + c.close) / 3;
     const vol = c.volume || 1;
     cumulativeTypicalVolume += typicalPrice * vol;
     cumulativeVolume += vol;
     result.push({
-      time: parseTime(c.timestamp),
+      time: chartTime(c.time),
       value: cumulativeTypicalVolume / cumulativeVolume,
     });
   }
@@ -91,7 +89,7 @@ export function TradingViewChart({
       },
     });
 
-    const candlestickSeries = chart.addCandlestickSeries({
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#22C55E",
       downColor: "#EF4444",
       borderVisible: false,
@@ -99,12 +97,10 @@ export function TradingViewChart({
       wickDownColor: "#EF4444",
     });
 
-    const parseTime = (t: string): Time => Math.floor(new Date(t).getTime() / 1000) as Time;
-
-    const sorted = [...candles].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const sorted = [...candles].sort((a, b) => a.time - b.time);
 
     const formattedData: CandlestickData[] = sorted.map((c) => ({
-      time: parseTime(c.timestamp),
+      time: chartTime(c.time),
       open: c.open,
       high: c.high,
       low: c.low,
@@ -114,7 +110,7 @@ export function TradingViewChart({
     candlestickSeries.setData(formattedData);
 
     if (showEMA20) {
-      const ema20Series = chart.addLineSeries({
+      const ema20Series = chart.addSeries(LineSeries, {
         color: "#3B82F6",
         lineWidth: 2,
         title: "EMA 20",
@@ -123,7 +119,7 @@ export function TradingViewChart({
     }
 
     if (showEMA50) {
-      const ema50Series = chart.addLineSeries({
+      const ema50Series = chart.addSeries(LineSeries, {
         color: "#F59E0B",
         lineWidth: 2,
         title: "EMA 50",
@@ -132,7 +128,7 @@ export function TradingViewChart({
     }
 
     if (showVWAP) {
-      const vwapSeries = chart.addLineSeries({
+      const vwapSeries = chart.addSeries(LineSeries, {
         color: "#EC4899",
         lineWidth: 2,
         title: "VWAP",
