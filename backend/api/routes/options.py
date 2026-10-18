@@ -31,21 +31,64 @@ router = APIRouter(prefix="/api/v1/options", tags=["options"])
 _QUOTE_BATCH = 20
 
 
+def get_nearest_future_expiry(underlying: str, exchange_segment: str = "nse_fo") -> str | None:
+    """Fetch distinct expiry dates from Angel One master, filter >= today in IST, and pick nearest future expiry."""
+    from datetime import datetime, timezone, timedelta
+    ist = timezone(timedelta(hours=5, minutes=30))
+    today_ist = datetime.now(tz=ist).strftime("%Y-%m-%d")
+
+    with app_cursor() as cursor:
+        # Check source = 'angel' first, fallback to all sources
+        cursor.execute(
+            """
+            SELECT DISTINCT expiry FROM instruments
+            WHERE (UPPER(underlying) = UPPER(?) OR UPPER(symbol) = UPPER(?))
+              AND exchange_segment = ?
+              AND option_type IN ('CE', 'PE')
+              AND expiry IS NOT NULL AND expiry != ''
+            ORDER BY expiry ASC
+            """,
+            (underlying, underlying, exchange_segment),
+        )
+        expiries = [row["expiry"] for row in cursor.fetchall() if row["expiry"]]
+
+    if not expiries:
+        # Also check with master.option_expiries
+        expiries = master.option_expiries(underlying, exchange_segment)
+
+    future = [d for d in expiries if d >= today_ist]
+    return min(future) if future else (expiries[0] if expiries else None)
+
+
 @router.get("/expiries")
 def expiry_dates(
     underlying: str = Query(description="Underlying symbol, e.g. NIFTY"),
     exchange_segment: str = Query(default="nse_fo"),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
-    """Available expiry dates for an underlying, ascending (`getExpiryDate`).
+    """Available expiry dates for an underlying, ascending (`getExpiryDate`)."""
+    from datetime import datetime, timezone, timedelta
+    ist = timezone(timedelta(hours=5, minutes=30))
+    today_ist = datetime.now(tz=ist).strftime("%Y-%m-%d")
 
-    `near` is the first expiry that has not passed — the series the chain shows
-    by default. An empty list means the instrument master has no contracts for
-    the underlying, which the UI reports as "run a sync" rather than as an error.
-    """
-    expiries = master.option_expiries(underlying, exchange_segment)
-    today = time.strftime("%Y-%m-%d", time.gmtime())
-    near = next((date for date in expiries if date >= today), None)
+    with app_cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT DISTINCT expiry FROM instruments
+            WHERE (UPPER(underlying) = UPPER(?) OR UPPER(symbol) = UPPER(?))
+              AND exchange_segment = ?
+              AND option_type IN ('CE', 'PE')
+              AND expiry IS NOT NULL AND expiry != ''
+            ORDER BY expiry ASC
+            """,
+            (underlying, underlying, exchange_segment),
+        )
+        expiries = [row["expiry"] for row in cursor.fetchall() if row["expiry"]]
+
+    if not expiries:
+        expiries = master.option_expiries(underlying, exchange_segment)
+
+    near = get_nearest_future_expiry(underlying, exchange_segment)
     return {
         "underlying": underlying,
         "exchange_segment": exchange_segment,
@@ -65,74 +108,108 @@ def expiry_dates(
 def option_chain(
     underlying: str = Query(description="Underlying symbol, e.g. NIFTY"),
     exchange_segment: str = Query(default="nse_fo"),
+    expiry: str | None = Query(default=None, description="ISO expiry date YYYY-MM-DD. If omitted, nearest future expiry is dynamically selected"),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
     """Full option chain with OI, IV, Greeks, PCR, max pain and support/resistance.
 
-    Contract metadata (strikes, expiries, tokens) comes from Kotak's instrument
-    master. Live prices (LTP, OI, IV) come from Angel One SmartAPI — Kotak and
-    Angel use different token namespaces, so Kotak tokens are mapped to Angel
-    tokens by trading_symbol before quoting.
+    1. Expiry date is dynamically resolved to the nearest future expiry if not explicitly passed.
+    2. Exact Angel One symbol tokens are fetched directly from the instrument master for each strike.
+    3. Quotes are fetched in rate-limited batches (<= 3 req/sec) to prevent HTTP 429 errors.
     """
-    contracts = master.option_contracts(underlying, exchange_segment)
-    if not contracts["rows"]:
+    # 1. Dynamically select nearest future expiry if not provided
+    selected_expiry = expiry or get_nearest_future_expiry(underlying, exchange_segment)
+
+    # 2. Query option contracts directly from the instruments table
+    with app_cursor() as cursor:
+        query = """
+            SELECT token, exchange_segment, trading_symbol, symbol, expiry, option_type,
+                   strike, lot_size, tick_size, precision, source
+            FROM instruments
+            WHERE (UPPER(underlying) = UPPER(?) OR UPPER(symbol) = UPPER(?))
+              AND exchange_segment = ?
+              AND option_type IN ('CE', 'PE')
+        """
+        params: list[Any] = [underlying, underlying, exchange_segment]
+        if selected_expiry:
+            query += " AND expiry = ?"
+            params.append(selected_expiry)
+        query += " ORDER BY expiry ASC, strike ASC"
+        cursor.execute(query, tuple(params))
+        raw_contracts = [dict(row) for row in cursor.fetchall()]
+
+    # If empty, try fallback with master
+    if not raw_contracts:
+        contracts_envelope = master.option_contracts(underlying, exchange_segment, expiry=selected_expiry)
+        by_expiry = contracts_envelope.get("rows", {})
+        all_expiries = contracts_envelope.get("expiries", [])
+    else:
+        all_expiries = sorted({c["expiry"] for c in raw_contracts if c["expiry"]})
+        by_expiry = {}
+        for c in raw_contracts:
+            exp_key = c["expiry"] or ""
+            strike_val = float(c["strike"] or 0)
+            bucket = by_expiry.setdefault(exp_key, {})
+            strike_entry = bucket.setdefault(strike_val, {
+                "strike": strike_val,
+                "expiry": c["expiry"],
+                "lot_size": c["lot_size"],
+                "tick_size": c["tick_size"],
+                "exchange_segment": c["exchange_segment"],
+            })
+            strike_entry[c["option_type"].lower()] = {
+                "token": str(c["token"]),
+                "trading_symbol": c["trading_symbol"],
+                "exchange_segment": c["exchange_segment"],
+            }
+        contracts_envelope = {"expiries": all_expiries, "rows": by_expiry, "count": len(raw_contracts)}
+
+    if not contracts_envelope["rows"]:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
-            f"No option contracts for '{underlying}' in the symbol master. Run a scrip-master sync.",
+            f"No option contracts for '{underlying}' in the symbol master. Please run an instrument sync.",
         )
 
-    # --- Map Kotak contract tokens -> Angel One tokens via trading_symbol ---
-    kotak_to_angel_token: dict[str, str] = {}
-    for strikes in contracts["rows"].values():
-        for entry in strikes.values():
-            for leg in ("call", "put"):
-                leg_entry = entry.get(leg) or {}
-                token = leg_entry.get("token")
-                sym = leg_entry.get("trading_symbol")
-                if token and sym:
-                    kotak_to_angel_token.setdefault(str(token), sym)
+    # If no expiry was selected yet, pick the nearest one from the envelope
+    if not selected_expiry:
+        selected_expiry = get_nearest_future_expiry(underlying, exchange_segment)
+        if not selected_expiry and all_expiries:
+            selected_expiry = all_expiries[0]
 
-    # Resolve Angel One tokens for each trading_symbol (source='angel' rows).
-    angel_token_by_symbol: dict[str, str] = {}
-    if kotak_to_angel_token:
-        symbols = list(set(kotak_to_angel_token.values()))
-        placeholders = ",".join("?" for _ in symbols)
-        with app_cursor() as cursor:
-            cursor.execute(
-                f"""
-                SELECT DISTINCT trading_symbol, token FROM instruments
-                WHERE trading_symbol IN ({placeholders})
-                  AND exchange_segment = ? AND source = 'angel'
-                """,
-                (*symbols, exchange_segment),
-            )
-            for row in cursor.fetchall():
-                angel_token_by_symbol[row["trading_symbol"]] = str(row["token"])
+    target_rows = by_expiry.get(selected_expiry or "") or (by_expiry[all_expiries[0]] if all_expiries else {})
 
-    kotak_to_angel_token = {
-        kt: angel_token_by_symbol[sym]
-        for kt, sym in kotak_to_angel_token.items()
-        if sym in angel_token_by_symbol
-    }
+    # 3. Collect exact symbol tokens for all strikes (Call and Put)
+    token_keys_to_fetch: list[tuple[str, str]] = []
+    token_to_quote_map: dict[str, Any] = {}
 
-    # --- Fetch live prices from Angel One SmartAPI ---
+    for strike, entry in target_rows.items():
+        for leg in ("call", "put"):
+            leg_info = entry.get(leg) or {}
+            tok = leg_info.get("token")
+            seg = leg_info.get("exchange_segment") or exchange_segment
+            if tok:
+                token_keys_to_fetch.append((str(tok), seg))
+
+    # De-duplicate token keys
+    unique_keys = list(dict.fromkeys(token_keys_to_fetch))
+
+    # 4. Fetch live quotes via Angel One SmartAPI in rate-limited batches
     fetch_error = None
-    quotes_by_angel_token: dict[str, Any] = {}
-    if kotak_to_angel_token:
-        angel_keys = list({(t, exchange_segment) for t in kotak_to_angel_token.values()})
-        call = angel_call(user)
+    if unique_keys:
         try:
-            angel_quotes_list = angel_fetch(call, angel_keys, quote_type="all")
-            for q in angel_quotes_list:
-                quotes_by_angel_token[q.token] = q
-        except Exception as error:  # noqa: BLE001 - chain still useful without prices
+            call = angel_call(user)
+            # angel_fetch already chunks into batches of <=40 and enforces 0.35s delay (max 3 req/sec)
+            quotes_list = angel_fetch(call, unique_keys, quote_type="all")
+            for q in quotes_list:
+                token_to_quote_map[str(q.token)] = q
+        except Exception as error:
             fetch_error = str(error)
+            log.warning("Option chain quotes fetch error for %s: %s", underlying, error)
 
     def quote_lookup(token: str, segment: str):
-        angel_token = kotak_to_angel_token.get(str(token))
-        if not angel_token:
+        if not token:
             return None
-        return quotes_by_angel_token.get(angel_token)
+        return token_to_quote_map.get(str(token))
 
     # Spot from the underlying index, so the Greeks use a real underlying price.
     underlying_record = _find_index_for(underlying)
@@ -141,7 +218,13 @@ def option_chain(
         spot_quote = quote_engine.cached(underlying_record["token"], underlying_record["exchange_segment"])
     spot = spot_quote.last if spot_quote and spot_quote.last else None
 
-    chain = build_chain(contracts, spot=spot, quote_lookup=quote_lookup, now_ts=time.time())
+    chain = build_chain(
+        contracts_envelope,
+        spot=spot,
+        quote_lookup=quote_lookup,
+        now_ts=time.time(),
+        target_expiry=selected_expiry,
+    )
     chain["underlying"] = underlying
     chain["fetch_error"] = fetch_error
     chain["spot_source"] = underlying_record["symbol"] if underlying_record else None

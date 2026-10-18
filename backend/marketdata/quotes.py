@@ -183,7 +183,20 @@ class QuoteEngine:
     # -- cache ------------------------------------------------------------
     def cached(self, token: str, exchange_segment: str) -> Quote | None:
         with self._lock:
-            return self._cache.get((str(token), exchange_segment))
+            tok_str = str(token)
+            res = self._cache.get((tok_str, exchange_segment))
+            if res is not None:
+                return res
+            # Alias fallback for BSE SENSEX and NSE index tokens
+            if tok_str == "265":
+                return self._cache.get(("99919000", exchange_segment))
+            if tok_str == "99919000":
+                return self._cache.get(("265", exchange_segment))
+            if not tok_str.startswith("999"):
+                return self._cache.get((f"999{tok_str}", exchange_segment))
+            if tok_str.startswith("999"):
+                return self._cache.get((tok_str[3:], exchange_segment))
+            return None
 
     def cached_many(self, keys: Iterable[tuple[str, str]]) -> list[Quote]:
         with self._lock:
@@ -192,6 +205,15 @@ class QuoteEngine:
     def store(self, quote: Quote) -> Quote:
         with self._lock:
             self._cache[(quote.token, quote.exchange_segment)] = quote
+            # Store alias so both 265 and 99919000 or 26000 and 99926000 are immediately available
+            if quote.token == "99919000" and quote.exchange_segment == "bse_cm":
+                self._cache[("265", "bse_cm")] = quote
+            elif quote.token == "265" and quote.exchange_segment == "bse_cm":
+                self._cache[("99919000", "bse_cm")] = quote
+            elif quote.token.startswith("999"):
+                self._cache[(quote.token[3:], quote.exchange_segment)] = quote
+            else:
+                self._cache[(f"999{quote.token}", quote.exchange_segment)] = quote
         return quote
 
     def apply_tick(self, payload: dict[str, Any]) -> Quote | None:

@@ -155,62 +155,106 @@ def fetch(
     keys: list[tuple[str, str]],
     quote_type: str = "all",
 ) -> list[Quote]:
-    """Fetch a live snapshot for `(token, exchange_segment)` pairs."""
+    """Fetch a live snapshot for `(token, exchange_segment)` pairs with rate limiting (max 3 req/sec)."""
     if not keys:
         return []
-    # Resolve master-level tokens to broker-usable tokens.  Index instruments
-    # such as SENSEX expose a *different* symbol token on the quote API, so we
-    # translate the internal master token (→ `INDEX_QUOTE_TOKEN`) before the
-    # request is sent.
+
+    # Map requested tokens to Angel external tokens (e.g. index aliases) while preserving the original token
+    token_alias_to_original: dict[str, str] = {}
     raw_resolved = instruments.to_smartapi(keys)
     resolved: list[tuple[str, str, str]] = []
     for token, symbol, segment in raw_resolved:
         external_token = instruments.INDEX_QUOTE_TOKEN.get(token, token)
+        token_alias_to_original[external_token] = token
+        token_alias_to_original[token] = token
         resolved.append((external_token, symbol, segment))
 
     if not resolved:
-        raise QuoteError(
-            "None of the requested instruments are in the Angel One master. " "Sync it first."
-        )
+        # Fallback: if instruments table lookup did not find some keys, attempt direct pass-through
+        for token, segment in keys:
+            exchange = instruments.SEGMENT_EXCHANGE.get(segment, "NSE")
+            ext_token = instruments.INDEX_QUOTE_TOKEN.get(token, token)
+            token_alias_to_original[ext_token] = token
+            token_alias_to_original[token] = token
+            resolved.append((ext_token, f"{exchange}:{token}", segment))
 
     quotes: list[Quote] = []
-    # Resolve tokens from the current OpenAPIScripMaster-backed instrument table,
-    # then send exactly one token in each FULL quote request.
-    for single in resolved:
-        _limiter.wait()
-        exchange = instruments.SEGMENT_EXCHANGE.get(single[2])
-        if exchange is None:
-            log.warning("Skipping unsupported Angel exchange segment: %s", single[2])
-            continue
+    mode = MODE_MAP.get(quote_type.lower(), "FULL")
 
-        # SmartAPI expects broker exchange codes (for example NSE), not the
-        # platform's database segment names (for example nse_cm). Keep this
-        # request deliberately single-token and FULL to match the quote API
-        # contract and avoid 400 responses from mixed/invalid payloads.
-        payload = call(
-            "quotes",
-            QUOTE_PATH,
-            payload={
-                "mode": "FULL",
-                "exchangeTokens": {
-                    exchange: [single[0]],
-                },
-            },
-            http_method="POST",
-        )
-        rows = _extract_rows(payload)
-        if not rows:
-            message = payload.get("message") if isinstance(payload, dict) else None
-            raise QuoteError(f"SmartAPI returned no quote rows: {message or payload}")
-        for row in rows:
-            token = row.get("symbolToken") or row.get("symbol_token")
-            symbol = str(row.get("tradingSymbol") or row.get("symbol") or "")
-            # The response is keyed by symbol, not token; resolve back.
-            match = _match([single], token, symbol)
-            if match is None:
+    # Group resolved tokens by exchange (e.g. "NFO", "NSE", "BSE")
+    by_exchange: dict[str, list[tuple[str, str, str]]] = {}
+    for entry in resolved:
+        ext_token, symbol, segment = entry
+        exchange = instruments.SEGMENT_EXCHANGE.get(segment, "NSE")
+        by_exchange.setdefault(exchange, []).append(entry)
+
+    # Angel One rate limiting: maximum 3 requests per second across all endpoints.
+    # We batch up to 40 tokens per request and pause 0.35s between requests (1/0.35 = 2.85 req/sec).
+    BATCH_SIZE = min(40, settings.angel_max_tokens_per_call)
+
+    for exchange, exchange_entries in by_exchange.items():
+        # Chunk into batches of up to BATCH_SIZE
+        for i in range(0, len(exchange_entries), BATCH_SIZE):
+            chunk = exchange_entries[i:i + BATCH_SIZE]
+            token_list = [entry[0] for entry in chunk]
+
+            # Enforce 3 req/sec rate limit before every call
+            time.sleep(0.35)
+
+            try:
+                payload = call(
+                    "quotes",
+                    QUOTE_PATH,
+                    payload={
+                        "mode": mode,
+                        "exchangeTokens": {
+                            exchange: token_list,
+                        },
+                    },
+                    http_method="POST",
+                )
+            except Exception as error:
+                # If HTTP 429 occurs, backoff and retry once
+                err_str = str(error)
+                if "429" in err_str or "Too Many Requests" in err_str:
+                    log.warning("Angel SmartAPI 429 rate limit hit. Backing off 1.0s and retrying...")
+                    time.sleep(1.0)
+                    try:
+                        payload = call(
+                            "quotes",
+                            QUOTE_PATH,
+                            payload={
+                                "mode": mode,
+                                "exchangeTokens": {
+                                    exchange: token_list,
+                                },
+                            },
+                            http_method="POST",
+                        )
+                    except Exception as retry_err:
+                        log.error("Retry failed for chunk %s on %s: %s", token_list, exchange, retry_err)
+                        continue
+                else:
+                    log.warning("Quote fetch failed for chunk on %s: %s", exchange, error)
+                    continue
+
+            rows = _extract_rows(payload)
+            if not rows:
                 continue
-            quote = quote_from_row(row, match[0], match[2])
-            quotes.append(quote)
+
+            for row in rows:
+                resp_token = str(row.get("symbolToken") or row.get("symbol_token") or "")
+                symbol = str(row.get("tradingSymbol") or row.get("symbol") or "")
+
+                # Map back to caller's original token (e.g. 26000 or specific strike token)
+                orig_token = token_alias_to_original.get(resp_token, resp_token)
+
+                # Find the segment for this token
+                segment = next((e[2] for e in chunk if e[0] == resp_token or e[0] == orig_token), "nse_cm")
+
+                quote = quote_from_row(row, orig_token, segment)
+                quotes.append(quote)
+
     return quotes
 
 

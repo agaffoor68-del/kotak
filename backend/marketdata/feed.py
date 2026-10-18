@@ -242,18 +242,26 @@ class MarketFeed:
     def _on_message(self, raw: Any) -> None:
         try:
             payload = raw if isinstance(raw, dict) else json.loads(raw)
-        except (TypeError, ValueError, json.JSONDecodeError):
+        except Exception:
+            import traceback
+            log.error("Failed to parse websocket message: %s", raw)
+            traceback.print_exc()
             return
         self.state.last_message_at = time.time()
         for row in self._iter_rows(payload):
-            frame = normalise_frame(row)
-            if frame is None:
-                continue
-            self.state.frames_received += 1
-            quote = quote_engine.apply_tick(frame)
-            if quote is not None:
-                ticks.record_quote(quote)
-                self._publish(quote.to_dict())
+            try:
+                frame = normalise_frame(row)
+                if frame is None:
+                    continue
+                self.state.frames_received += 1
+                quote = quote_engine.apply_tick(frame)
+                if quote is not None:
+                    ticks.record_quote(quote)
+                    self._publish(quote.to_dict())
+            except Exception as error:
+                import traceback
+                log.error("Error processing websocket tick: %s", error)
+                traceback.print_exc()
 
     @staticmethod
     def _iter_rows(payload: Any) -> list[dict[str, Any]]:

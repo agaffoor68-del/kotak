@@ -173,10 +173,16 @@ class AngelFeed:
             batch = keys[batch_start:batch_start + settings.angel_max_tokens_per_call]
             quotes = angel_quotes.fetch(call, batch, quote_type="all")
             for quote in quotes:
-                quote_engine.store(quote)
-                ticks.record_quote(quote)
-                self._publish(quote.to_dict())
-                published += 1
+                try:
+                    quote_engine.store(quote)
+                    ticks.record_quote(quote)
+                    self._publish(quote.to_dict())
+                    published += 1
+                except Exception as error:
+                    import traceback
+                    log.error("Failed to store/record angel quote: %s", error)
+                    traceback.print_exc()
+        ticks.maybe_flush()
         return published
 
     # -- lifecycle -------------------------------------------------------

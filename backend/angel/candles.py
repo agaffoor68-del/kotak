@@ -185,9 +185,17 @@ def _call_historical(
     is_index: bool = False,
 ) -> list[dict[str, Any]]:
     # SmartAPI wants a JSON body (not query params) for getCandleData.
-    # Index candles need a `999`-prefixed symboltoken and exchange "NSE".
-    exchange = "NSE" if is_index else SEGMENT_EXCHANGE.get(segment, "NSE")
-    symboltoken = f"999{token}" if is_index else str(token)
+    # BSE indices (e.g. SENSEX) need exchange "BSE" and token "99919000".
+    # NSE indices need exchange "NSE" and a 999-prefixed token (e.g. 99926000).
+    if segment == "bse_cm" or str(token) in ("265", "99919000"):
+        exchange = "BSE"
+        symboltoken = "99919000"
+    elif is_index:
+        exchange = "NSE"
+        symboltoken = str(token) if str(token).startswith("999") else f"999{token}"
+    else:
+        exchange = SEGMENT_EXCHANGE.get(segment, "NSE")
+        symboltoken = str(token)
     payload = call(
         "historical",
         HISTORICAL_PATH,

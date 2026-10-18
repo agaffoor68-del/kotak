@@ -156,6 +156,7 @@ def build_chain(
     spot: float | None,
     quote_lookup,
     now_ts: float,
+    target_expiry: str | None = None,
 ) -> dict[str, Any]:
     """Assemble a full option chain.
 
@@ -163,21 +164,31 @@ def build_chain(
     i.e. ``{expiries: [...], rows: {expiry: {strike: {call: ..., put: ...}}}}``,
     and `quote_lookup(token, segment)` returns a live `Quote` (or `None`).
 
-    The near expiry (the first in an ascending list) is the one charted; a
-    contract whose expiry has already passed is skipped rather than shown as a
-    stale chain.
+    The near future expiry (or explicit `target_expiry`) is selected.
     """
     by_expiry = contracts.get("rows") or {}
-    # `expiries` is sorted ascending by the master; the near date is the first
-    # one that is today or later, so an expired series never becomes "the chain".
     expiries = list(contracts.get("expiries") or [])
-    today = time.strftime("%Y-%m-%d", time.gmtime(now_ts))
-    expiry = next((date for date in expiries if date and date >= today), None)
+
+    # Indian market IST date for accurate expiry comparison
+    from datetime import datetime, timezone, timedelta
+    ist = timezone(timedelta(hours=5, minutes=30))
+    today = datetime.fromtimestamp(now_ts, tz=ist).strftime("%Y-%m-%d")
+
+    # If target_expiry is specified and present, use it; otherwise pick nearest future expiry >= today
+    if target_expiry and target_expiry in by_expiry:
+        expiry = target_expiry
+    elif target_expiry and target_expiry in expiries:
+        expiry = target_expiry
+    else:
+        # Dynamically select nearest future expiry
+        future_expiries = [d for d in expiries if d and d >= today]
+        expiry = min(future_expiries) if future_expiries else (expiries[0] if expiries else None)
+
     if expiry is None:
         return {
             "expiries": expiries, "rows": [], "spot": spot,
             "has_data": False, "greeks_available": False,
-            "note": "Every expiry in the master is in the past. Sync the instrument master.",
+            "note": "No active expiry dates found in the instrument master. Please sync instrument master.",
         }
 
     rows_by_strike = by_expiry.get(expiry) or {}

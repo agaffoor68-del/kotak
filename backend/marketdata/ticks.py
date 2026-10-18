@@ -63,6 +63,8 @@ def _flush_locked() -> int:
         _last_flush = time.time()
         return 0
     batch, _pending[:] = list(_pending), []
+
+    # 1. Save raw ticks to ticks table
     try:
         with market_cursor() as cursor:
             cursor.executemany(
@@ -73,9 +75,60 @@ def _flush_locked() -> int:
                 """,
                 batch,
             )
-    except Exception as error:  # noqa: BLE001 - recording must never break the feed
-        log.warning("Tick write failed (%d rows dropped): %s", len(batch), error)
+    except Exception as error:
+        import traceback
+        log.error("Tick write failed (%d rows dropped): %s", len(batch), error)
+        traceback.print_exc()
         return 0
+
+    # 2. Real-time candle aggregation: group batch by (token, segment, 5m_bucket)
+    try:
+        # 5m interval is 300 seconds
+        five_min_sec = INTERVAL_SECONDS["5m"]
+        candle_buckets: dict[tuple[str, str, int], list[tuple[float, float, float]]] = {}
+
+        for row in batch:
+            token, segment, ts, last_price, _, _, _, _, volume, _, _, _, _ = row
+            if last_price is None:
+                continue
+            bucket = int(ts // five_min_sec)
+            candle_buckets.setdefault((str(token), segment, bucket), []).append((ts, last_price, volume or 0.0))
+
+        if candle_buckets:
+            candle_rows: list[tuple[Any, ...]] = []
+            now_ts = time.time()
+            for (tok, seg, bkt), tick_list in candle_buckets.items():
+                tick_list.sort(key=lambda x: x[0])
+                prices = [x[1] for x in tick_list]
+                volumes = [x[2] for x in tick_list]
+                candle_rows.append((
+                    tok, seg, "5m", bkt,
+                    prices[0], max(prices), min(prices), prices[-1],
+                    volumes[-1] if volumes else 0.0,
+                    len(tick_list),
+                    now_ts,
+                ))
+
+            with market_cursor() as cursor:
+                cursor.executemany(
+                    """
+                    INSERT INTO candles (token, exchange_segment, interval, bucket, open, high, low, close, volume, trades, updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(token, exchange_segment, interval, bucket) DO UPDATE SET
+                        high   = MAX(candles.high, excluded.high),
+                        low    = MIN(candles.low, excluded.low),
+                        close  = excluded.close,
+                        volume = excluded.volume,
+                        trades = candles.trades + excluded.trades,
+                        updated_at = excluded.updated_at
+                    """,
+                    candle_rows,
+                )
+    except Exception as error:
+        import traceback
+        log.error("Live 5-minute candle aggregation failed: %s", error)
+        traceback.print_exc()
+
     _last_flush = time.time()
     return len(batch)
 
@@ -112,29 +165,71 @@ def upsert_candles(token: str, exchange_segment: str, interval: str, rows: list[
                 """,
                 rows,
             )
-    except Exception as error:  # noqa: BLE001
-        log.warning("Candle upsert failed for %s %s: %s", token, interval, error)
+    except Exception as error:
+        import traceback
+        log.error("Candle upsert failed for %s %s: %s", token, interval, error)
+        traceback.print_exc()
         return 0
     return len(rows)
 
 
 def build_candles(token: str, exchange_segment: str, interval: str, *, since: float | None = None) -> list[dict[str, Any]]:
-    """Aggregate every recorded tick for one instrument into OHLCV candles."""
+    """Aggregate every recorded tick for one instrument into OHLCV candles with accurate epoch timestamps."""
     if interval not in INTERVAL_SECONDS:
         raise ValueError(f"Unsupported interval {interval!r}; expected one of {sorted(INTERVAL_SECONDS)}")
 
-    floor = _bucket(since, interval) * INTERVAL_SECONDS[interval] if since else 0
-    with market_cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT ts, last_price, volume
-            FROM ticks
-            WHERE token = ? AND exchange_segment = ? AND ts >= ?
-            ORDER BY ts ASC
-            """,
-            (str(token), exchange_segment, floor),
-        )
-        ticks = cursor.fetchall()
+    interval_sec = INTERVAL_SECONDS[interval]
+    floor = _bucket(since, interval) * interval_sec if since else 0
+
+    try:
+        # First check pre-aggregated candles table
+        with market_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT bucket, open, high, low, close, volume, trades
+                FROM candles
+                WHERE token = ? AND exchange_segment = ? AND interval = ? AND (bucket * ?) >= ?
+                ORDER BY bucket ASC
+                """,
+                (str(token), exchange_segment, interval, interval_sec, floor),
+            )
+            stored_rows = cursor.fetchall()
+            if stored_rows:
+                return [
+                    {
+                        "time": int(r["bucket"] * interval_sec),  # Convert bucket index to epoch seconds
+                        "open": float(r["open"]),
+                        "high": float(r["high"]),
+                        "low": float(r["low"]),
+                        "close": float(r["close"]),
+                        "volume": float(r["volume"] or 0),
+                        "trades": int(r["trades"] or 0),
+                    }
+                    for r in stored_rows
+                ]
+    except Exception as error:
+        import traceback
+        log.warning("Reading pre-aggregated candles failed, falling back to raw ticks: %s", error)
+        traceback.print_exc()
+
+    # Fallback to aggregating directly from ticks table
+    try:
+        with market_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT ts, last_price, volume
+                FROM ticks
+                WHERE token = ? AND exchange_segment = ? AND ts >= ?
+                ORDER BY ts ASC
+                """,
+                (str(token), exchange_segment, floor),
+            )
+            ticks = cursor.fetchall()
+    except Exception as error:
+        import traceback
+        log.error("Reading ticks failed for %s %s: %s", token, exchange_segment, error)
+        traceback.print_exc()
+        return []
 
     if not ticks:
         return []
@@ -151,12 +246,12 @@ def build_candles(token: str, exchange_segment: str, interval: str, *, since: fl
             continue
         volumes = [t["volume"] for t in bucket_ticks if t["volume"] is not None]
         candles.append({
-            "time": bucket,
-            "open": prices[0],
-            "high": max(prices),
-            "low": min(prices),
-            "close": prices[-1],
-            "volume": volumes[-1] if volumes else 0,
+            "time": int(bucket * interval_sec),  # Fix: convert bucket to epoch timestamp in seconds!
+            "open": float(prices[0]),
+            "high": float(max(prices)),
+            "low": float(min(prices)),
+            "close": float(prices[-1]),
+            "volume": float(volumes[-1] if volumes else 0),
             "trades": len(bucket_ticks),
         })
     return candles
