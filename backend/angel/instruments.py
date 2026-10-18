@@ -44,14 +44,14 @@ EXCHANGE_PREFIX = {
     "CDS": "cde_fo",
 }
 
-#: The reverse map: the platform's segment name back to Angel's exchanger code.
+#: The reverse map: the platform's segment name back to Angel's exchange code.
 SEGMENT_EXCHANGE = {value: key for key, value in EXCHANGE_PREFIX.items()}
+#: SmartAPI WebSocket exchange types. SENSEX is BSE cash-market type 3.
+SEGMENT_EXCHANGE_TYPE = {"nse_cm": 1, "nse_fo": 2, "bse_cm": 3, "bse_fo": 4, "mcx_fo": 5, "cde_fo": 13}
 
-#: Master token -> SmartAPI quote token for indices (Kotak Neo supplies
-#: different tokens for index quotes than for the instrument master).
-INDEX_QUOTE_TOKEN: dict[str, str] = {
-    "265": "99919000",  # SENSEX (BSE)
-}
+#: SmartAPI's quote token for the BSE SENSEX index. The master commonly lists
+#: the legacy platform token 265, but quote/feed requests must send this token.
+INDEX_QUOTE_TOKEN: dict[str, str] = {"265": "99919000", "99919000": "99919000"}
 
 SYNC_INTERVAL_SECONDS = 12 * 60 * 60
 
