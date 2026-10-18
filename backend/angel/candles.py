@@ -15,9 +15,12 @@ done explicitly here and never left to the caller. The interval vocabulary is
 ``1m``/``1d``, and the frontend never sees Angel's names.
 
 A single call is capped (roughly a year for minute bars), so a long range is
-chunked and the pieces are concatenated in order. Results are cached briefly and
-also written to the shared ``candles`` table, so a restart does not lose history
-and a repeated request costs nothing.
+chunked and the pieces are concatenated in order. Every chunk spends a token
+from the process-wide :data:`backend.angel.ratelimit.angel_limiter`, so candle
+backfills and the live quote feed together never exceed SmartAPI's 3 req/sec
+budget. Results are cached briefly (keyed by the requested *window*, so a short
+request cannot satisfy a long one) and also written to the shared ``candles``
+table, so a restart does not lose history and a repeated request costs nothing.
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ from typing import Any, Callable
 from backend.core.config import settings
 from backend.core.database import market_cursor
 from backend.marketdata import ticks
+from backend.angel.ratelimit import angel_limiter
 
 log = logging.getLogger("alphatrade.angel.candles")
 
@@ -57,8 +61,21 @@ CHUNK_DAYS: dict[str, int] = {
 }
 
 _CACHE_TTL = 20.0
-_cache: dict[tuple[str, str, str], tuple[float, list[dict[str, Any]]]] = {}
+#: Key is (token, exchange_segment, interval, start_bucket, end_bucket) so a short
+#: `days=2` request can never satisfy a later `days=500` request from the cache.
+_cache: dict[tuple[str, str, str, int, int], tuple[float, list[dict[str, Any]]]] = {}
 _cache_lock = threading.Lock()
+
+
+def _range_key(token: str, exchange_segment: str, interval: str, start: datetime, end: datetime) -> tuple[str, str, str, int, int]:
+    """Bucket the requested window so a wider request never reads a narrower cache hit.
+
+    The bucket is the candle's own interval, so a request for the same day at the
+    same interval hits, while a request that starts earlier (and therefore needs
+    more history) does not reuse a short window's result.
+    """
+    seconds = max(1, ticks.INTERVAL_SECONDS.get(interval, 300))
+    return (str(token), exchange_segment, interval, int(start.timestamp() // seconds), int(end.timestamp() // seconds))
 
 
 class CandleError(RuntimeError):
@@ -156,9 +173,16 @@ def _call_historical(
         },
         http_method="POST",
     )
-    data = payload.get("data") if isinstance(payload, dict) else None
+    # SmartAPI wraps the rows in `data`; on failure it may return an empty list,
+    # a null, or an error envelope instead. Treat every one of those as "no data
+    # for this window" rather than letting a malformed payload reach the parser.
+    data = payload.get("data") if isinstance(payload, dict) else payload
     if data is None:
-        raise CandleError(f"SmartAPI returned no candle data for {symbol}")
+        message = payload.get("message") if isinstance(payload, dict) else None
+        raise CandleError(f"SmartAPI returned no candle data for {symbol}: {message or 'empty response'}")
+    if isinstance(data, dict):
+        # Some responses nest the array under a key; pull the first list found.
+        data = next((value for value in data.values() if isinstance(value, list)), [])
     return normalise_rows(data)
 
 
@@ -193,6 +217,9 @@ def fetch(
     cursor = start
     while cursor < end:
         stop = min(cursor + timedelta(days=chunk), end)
+        # One token per historical call, shared with the quote feed so the whole
+        # process stays inside SmartAPI's 3 req/sec budget.
+        angel_limiter.wait()
         try:
             rows = _call_historical(
                 call, token=str(token), segment=exchange_segment, symbol=symbol,
@@ -205,7 +232,6 @@ def fetch(
         for candle in rows:
             merged[candle["time"]] = candle
         cursor = stop
-        time.sleep(0.2)  # stay inside SmartAPI's rate limit between chunks
 
     candles = [merged[key] for key in sorted(merged)]
     return candles
@@ -225,6 +251,20 @@ def _symbol_for(token: str, exchange_segment: str) -> str | None:
     return f"{SEGMENT_EXCHANGE.get(exchange_segment, 'NSE')}:{row['trading_symbol']}"
 
 
+def _window(
+    days: int | None, start: datetime | None, end: datetime | None
+) -> tuple[datetime, datetime]:
+    """Resolve the requested window, clamping the span to the configured maximum."""
+    resolved_end = end or datetime.now(tz=IST)
+    if start is None:
+        span = days if days is not None else settings.angel_history_days_default
+        span = max(1, min(int(span), settings.angel_history_days_max))
+        resolved_start = resolved_end - timedelta(days=span)
+    else:
+        resolved_start = start
+    return resolved_start, resolved_end
+
+
 def history(
     call: Callable[..., dict[str, Any]],
     token: str,
@@ -233,24 +273,74 @@ def history(
     limit: int = 500,
     *,
     days: int | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Candles for the UI, cached for a few seconds, newest last.
 
-    Returns ``(candles, from_cache)``. The candles are persisted so a restart
-    keeps whatever history has already been pulled.
+    Returns ``(candles, from_cache)``. The cache key includes the requested
+    window, so a short request (e.g. a 2-day live-candle probe) cannot satisfy a
+    long one within the TTL. The candles are persisted so a restart keeps
+    whatever history has already been pulled.
     """
-    key = (str(token), exchange_segment, interval)
+    window_start, window_end = _window(days, start, end)
+    key = _range_key(token, exchange_segment, interval, window_start, window_end)
     now = time.time()
     with _cache_lock:
         cached = _cache.get(key)
         if cached and now - cached[0] < _CACHE_TTL:
             return cached[1][-limit:], True
 
-    candles = fetch(call, token, exchange_segment, interval, days=days)
+    candles = fetch(
+        call, token, exchange_segment, interval,
+        days=days, start=window_start, end=window_end,
+    )
     store(token, exchange_segment, interval, candles)
     with _cache_lock:
         _cache[key] = (now, candles)
     return candles[-limit:], False
+
+
+def backfill(
+    call: Callable[..., dict[str, Any]],
+    token: str,
+    exchange_segment: str,
+    interval: str,
+    *,
+    since: float | None = None,
+    days: int | None = None,
+) -> list[dict[str, Any]]:
+    """Fill the gap between the last stored candle and now.
+
+    Called after a WebSocket (or feed) reconnect: the live tape cannot deliver
+    bars that formed while the connection was down, so the missing window is
+    pulled from SmartAPI's historical endpoint once and merged into the store.
+    ``since`` is an epoch second; when omitted the gap is measured from the
+    newest candle already persisted. Returns the candles fetched.
+    """
+    end = datetime.now(tz=IST)
+    if since is None:
+        stored = ticks.history(token, exchange_segment, interval, limit=1)
+        last_ts = stored[-1]["time"] if stored else None
+        since = last_ts if last_ts is not None else (end - timedelta(days=days or settings.angel_history_days_default)).timestamp()
+
+    start = datetime.fromtimestamp(float(since), tz=IST)
+    if start >= end:
+        return []
+
+    try:
+        candles = fetch(call, token, exchange_segment, interval, start=start, end=end)
+    except CandleError as error:
+        log.warning("Backfill failed for %s %s: %s", token, interval, error)
+        return []
+
+    # Only persist bars at or after the gap start, so the seam is continuous.
+    fresh = [candle for candle in candles if candle["time"] >= start.timestamp()]
+    if fresh:
+        store(token, exchange_segment, interval, fresh)
+        with _cache_lock:
+            _cache.clear()
+    return fresh
 
 
 def incremental(

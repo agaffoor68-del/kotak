@@ -172,6 +172,9 @@ needs no broker argument.
 ## Deployment
 
 See **[DEPLOY.md](DEPLOY.md)** for Docker Compose, systemd, nginx and CI/CD.
+Running a single always-on VM? **[CLOUD.md](CLOUD.md)** wires the stack with a watchdog and
+backups, and **[HOSTINGER.md](HOSTINGER.md)** adapts it step by step to a Hostinger VPS
+(hPanel firewall, DNS, dedicated static IP for the SEBI requirement, certbot).
 
 Short version, the things that make it "always running":
 

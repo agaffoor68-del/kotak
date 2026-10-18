@@ -265,23 +265,35 @@ def list_by_trading_symbol(trading_symbol: str, exchange_segment: str | None = N
         return [dict(row) for row in cursor.fetchall()]
 
 
-def option_contracts(underlying: str, exchange_segment: str = "nse_fo") -> dict[str, Any]:
+def option_contracts(
+    underlying: str,
+    exchange_segment: str = "nse_fo",
+    expiry: str | None = None,
+) -> dict[str, Any]:
     """Every CE/PE contract for an underlying, grouped by expiry.
 
     Returns `{expiries: [...], rows: [...]}` where each row is one strike with
     both legs. Returns an empty result rather than guessing when the master has
     no contracts for the underlying.
+
+    When `expiry` is given (ISO ``YYYY-MM-DD``) only that series is returned, so
+    the option chain can show a chosen expiry instead of always the near one.
     """
+    clause = ""
+    params: list[Any] = [underlying, exchange_segment]
+    if expiry:
+        clause = " AND expiry = ?"
+        params.append(expiry)
     with app_cursor() as cursor:
         cursor.execute(
-            """
+            f"""
             SELECT token, exchange_segment, trading_symbol, symbol, expiry, option_type,
                    strike, lot_size, tick_size, precision
             FROM instruments
-            WHERE UPPER(underlying) = UPPER(?) AND exchange_segment = ? AND option_type IN ('CE','PE')
+            WHERE UPPER(underlying) = UPPER(?) AND exchange_segment = ? AND option_type IN ('CE','PE'){clause}
             ORDER BY expiry ASC, strike ASC
             """,
-            (underlying, exchange_segment),
+            tuple(params),
         )
         contracts = [dict(row) for row in cursor.fetchall()]
 
@@ -301,6 +313,26 @@ def option_contracts(underlying: str, exchange_segment: str = "nse_fo") -> dict[
             "exchange_segment": contract["exchange_segment"],
         }
     return {"expiries": expiries, "rows": by_expiry, "count": len(contracts)}
+
+
+def option_expiries(underlying: str, exchange_segment: str = "nse_fo") -> list[str]:
+    """Distinct option expiries for an underlying, ascending (ISO dates).
+
+    This is the `getExpiryDate` surface for the UI: it never invents a date —
+    when the master has no contracts for the underlying the list is empty and the
+    caller reports that a scrip-master sync is needed.
+    """
+    with app_cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT DISTINCT expiry FROM instruments
+            WHERE UPPER(underlying) = UPPER(?) AND exchange_segment = ?
+              AND option_type IN ('CE','PE') AND expiry IS NOT NULL AND expiry != ''
+            ORDER BY expiry ASC
+            """,
+            (underlying, exchange_segment),
+        )
+        return [row["expiry"] for row in cursor.fetchall()]
 
 
 def universe(exchange_segment: str = "nse_cm", limit: int | None = None) -> list[dict[str, Any]]:
