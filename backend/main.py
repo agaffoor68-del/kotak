@@ -39,6 +39,7 @@ from backend.broker import accounts
 from backend.broker.neo_auth import session_manager
 from backend.core.config import settings
 from backend.marketdata import master
+from backend.marketdata.breadth import breadth_worker
 from backend.marketdata.feed import market_feed
 
 log = logging.getLogger("alphatrade")
@@ -93,10 +94,18 @@ async def lifespan(app: FastAPI):
         market_feed.start()
     except Exception:  # noqa: BLE001
         log.exception("Kotak Neo websocket feed failed to start; continuing without it")
+    try:
+        breadth_worker.start(_angel_feed_resolver)
+    except Exception:  # noqa: BLE001
+        log.exception("Market breadth worker failed to start; continuing without it")
 
     yield
 
     log.info("Shutting down AlphaTradePro")
+    try:
+        breadth_worker.stop()
+    except Exception:  # noqa: BLE001
+        log.exception("Error stopping the market breadth worker")
     try:
         market_feed.stop()
     except Exception:  # noqa: BLE001

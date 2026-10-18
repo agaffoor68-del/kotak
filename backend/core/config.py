@@ -169,6 +169,7 @@ class Settings:
         self.record_ticks = _flag("RECORD_TICKS", True)
         self.tick_retention_days = _int("TICK_RETENTION_DAYS", 30)
         self.breadth_universe_size = _int("BREADTH_UNIVERSE_SIZE", 200)
+        self.breadth_refresh_seconds = _int("BREADTH_REFRESH_SECONDS", 60)
 
         # --- websocket fan-out -------------------------------------------
         self.broadcast_queue_size = _int("BROADCAST_QUEUE_SIZE", 512)

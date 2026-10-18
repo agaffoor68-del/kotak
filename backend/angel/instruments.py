@@ -50,8 +50,9 @@ SEGMENT_EXCHANGE = {value: key for key, value in EXCHANGE_PREFIX.items()}
 #: Master token -> SmartAPI quote token for indices (Kotak Neo supplies
 #: different tokens for index quotes than for the instrument master).
 INDEX_QUOTE_TOKEN: dict[str, str] = {
-    "265": "99919000",  # SENSEX (BSE)
+    "265": "99919000",  # SENSEX (BSE_CM quote token)
 }
+INDEX_MASTER_TOKEN: dict[str, str] = {quote_token: master_token for master_token, quote_token in INDEX_QUOTE_TOKEN.items()}
 
 SYNC_INTERVAL_SECONDS = 12 * 60 * 60
 
@@ -316,7 +317,11 @@ def to_smartapi(keys: list[tuple[str, str]]) -> list[tuple[str, str, str]]:
     """Map (token, segment) pairs to (token, broker_symbol, segment)."""
     resolved: list[tuple[str, str, str]] = []
     for token, segment in keys:
-        symbol = _broker_symbol(str(token), segment)
+        # SmartAPI's quote endpoint uses a distinct BSE_CM index token for
+        # SENSEX. Accept both the master token (265) and quote token (99919000)
+        # while always resolving the canonical BSE instrument metadata.
+        master_token = INDEX_MASTER_TOKEN.get(str(token), str(token))
+        symbol = _broker_symbol(master_token, segment)
         if symbol:
             resolved.append((str(token), symbol, segment))
     return resolved

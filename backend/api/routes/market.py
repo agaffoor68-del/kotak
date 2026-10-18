@@ -25,6 +25,7 @@ from backend.angel.quotes import fetch as angel_fetch
 from backend.api.deps import CurrentUser, angel_call, current_user, require_admin
 from backend.core.config import settings
 from backend.marketdata import market_hours, master, ticks
+from backend.marketdata.breadth import breadth_worker
 from backend.marketdata.quotes import quote_engine
 
 router = APIRouter(prefix="/api/v1/market", tags=["market"])
@@ -224,29 +225,15 @@ def market_breadth(
     limit: int = Query(default=settings.breadth_universe_size, ge=10, le=1000),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
-    """Advance/decline breadth over a real universe of instruments."""
-    universe = angel_instruments.equity_universe("nse_cm", limit)
-    if not universe:
-        universe = master.universe("nse_cm", limit)
-    if not universe:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "No instruments in the master. Sync the Angel One instrument master first.",
-        )
-    call = angel_call(user)
-    keys = [(item["token"], item["exchange_segment"]) for item in universe]
-    quotes = angel_fetch(call, keys, quote_type="ltp")
+    """Return the latest background breadth snapshot.
 
-    return {
-        "as_of": time.time(),
-        "source": "angel_one",
-        "universe_size": len(universe),
-        "priced": len([q for q in quotes if q.last is not None]),
-        "breadth": market_hours.breadth(quotes),
-        "top_gainers": market_hours.rank(quotes, limit=10, reverse=True),
-        "top_losers": market_hours.rank(quotes, limit=10, reverse=False),
-        "most_active": market_hours.most_active(quotes, limit=10),
-    }
+    The worker samples a configurable NSE cash-equity universe using Angel
+    One LTP quotes; it excludes unpriced symbols and never treats them as flat.
+    """
+    snapshot = breadth_worker.snapshot()
+    if snapshot.get("status") == "waiting":
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Market breadth is warming up")
+    return snapshot
 
 
 @router.get("/feed/subscribe")
