@@ -254,6 +254,7 @@ def sync(*, url: str | None = None, segments: Iterable[str] | None = None) -> di
                         idx["trading_symbol"],
                         idx["name"],
                         idx["symbol"],
+                        idx["symbol"],
                         SOURCE,
                         timestamp,
                     ),
@@ -288,10 +289,8 @@ def is_due(force: bool = False) -> bool:
 
 
 def bootstrap_if_empty() -> dict[str, Any]:
-    """Populate the master on first boot so market data is usable immediately."""
-    from backend.marketdata import master
-
-    if master.status()["instruments"]:
+    """Populate the Angel master on first boot so market data is usable immediately."""
+    if status()["instruments"]:
         return {"status": "skipped", "reason": "master already populated"}
     return sync()
 

@@ -163,11 +163,7 @@ def seed_instrument_master() -> None:
     and never fatal, because a network blip must not stop the API booting.
     """
     from backend.angel import instruments as angel_instruments
-    from backend.marketdata import master
-
     try:
-        if master.status()["instruments"]:
-            return
         result = angel_instruments.bootstrap_if_empty()
         log.info("Instrument master bootstrap: %s", result.get("status"))
     except Exception as error:  # noqa: BLE001 - a data fetch must not break boot
