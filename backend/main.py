@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 
 from backend import app_bootstrap
 from backend.angel.auth import angel_session_manager
+from backend.angel.breadth import market_breadth_worker
 from backend.angel.feed import angel_feed
 from backend.api.routes import (
     admin_users,
@@ -90,6 +91,10 @@ async def lifespan(app: FastAPI):
     except Exception:  # noqa: BLE001
         log.exception("Angel market feed failed to start; continuing without it")
     try:
+        market_breadth_worker.start(_angel_feed_resolver)
+    except Exception:  # noqa: BLE001
+        log.exception("Angel market breadth worker failed to start; continuing without it")
+    try:
         market_feed.start()
     except Exception:  # noqa: BLE001
         log.exception("Kotak Neo websocket feed failed to start; continuing without it")
@@ -101,6 +106,10 @@ async def lifespan(app: FastAPI):
         market_feed.stop()
     except Exception:  # noqa: BLE001
         log.exception("Error stopping the Kotak Neo websocket feed")
+    try:
+        market_breadth_worker.stop()
+    except Exception:  # noqa: BLE001
+        log.exception("Error stopping the Angel market breadth worker")
     try:
         angel_feed.stop()
     except Exception:  # noqa: BLE001
