@@ -50,8 +50,11 @@ function Analytics() {
 
   // Drawdown series as a chart, offset so the area is visible.
   const drawdownBars = useMemo(
-    () =>
-      (data?.drawdown_curve ?? []).map((value, index) => ({
+    () => {
+      // Transform drawdown_curve into Candle format for PriceChart
+      // Ensure timestamp is string for compatibility, time is number for chart
+      return (data?.drawdown_curve ?? []).map((value, index) => ({
+        timestamp: String(index),
         time: index,
         open: 0,
         high: value,
@@ -59,8 +62,9 @@ function Analytics() {
         close: value,
         volume: 0,
         trades: 0,
-      })),
-    [data],
+      }));
+    },
+    [data]
   );
 
   if (loading && !data) return <Loading label="Crunching analytics" />;

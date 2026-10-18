@@ -181,6 +181,8 @@ const post = <T,>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
 const put = <T,>(path: string, body: unknown) =>
   request<T>(path, { method: "PUT", body: JSON.stringify(body) });
+const patch = <T,>(path: string, body: unknown) =>
+  request<T>(path, { method: "PATCH", body: JSON.stringify(body) });
 const del = <T,>(path: string) => request<T>(path, { method: "DELETE" });
 
 /* ------------------------------------------------------------------- types */
@@ -191,6 +193,7 @@ export interface User {
   role: "admin" | "trader" | "viewer";
   account_id?: string | null;
   is_active?: boolean;
+  whatsapp_number?: string | null;
 }
 
 export interface Quote {
@@ -232,6 +235,11 @@ export interface Instrument {
 }
 
 export interface Candle {
+  // Backend returns timestamp as string, convert to number for chart
+  // Keep both fields for backward compatibility during migration
+  // Coverage interface for market data availability
+// export type Coverage = { ... }  // Removed: duplicate identifier, defined below
+
   time: number;
   open: number;
   high: number;
@@ -239,15 +247,6 @@ export interface Candle {
   close: number;
   volume: number;
   trades: number;
-}
-
-export interface Coverage {
-  ticks: number;
-  first_tick: number | null;
-  last_tick: number | null;
-  span_seconds: number;
-  has_history: boolean;
-  note: string;
 }
 
 export interface MarketStatus {
@@ -300,8 +299,15 @@ export interface OptionLeg {
   iv: number | null;
   delta?: number | null;
   gamma?: number | null;
-  theta?: number | null;
-  vega?: number | null;
+}
+
+export interface Coverage {
+  ticks: number;
+  first_tick: number | null;
+  last_tick: number | null;
+  span_seconds: number;
+  has_history: boolean;
+  note?: string;
 }
 
 export interface OptionChain {
@@ -505,6 +511,16 @@ export const api = {
   listUsers: () => get<User[]>("/api/v1/auth/users"),
   createUser: (email: string, password: string, role: string) =>
     post<User>("/api/v1/auth/users", { email, password, role }),
+  updateUserRole: (userId: string, role: string) =>
+    patch<{ id: string; email: string; role: string; is_active: boolean }>(
+      `/api/v1/admin/users/${encodeURIComponent(userId)}/role`,
+      { role },
+    ),
+  updateSettings: (whatsappNumber: string | null) =>
+    put<{ id: string; email: string; role: string; whatsapp_number: string | null }>(
+      "/api/v1/users/settings",
+      { whatsapp_number: whatsappNumber },
+    ),
   createApiKey: (name: string) => post<{ api_key: string; warning: string }>("/api/v1/auth/api-keys", { name }),
 
   // market

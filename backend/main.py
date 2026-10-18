@@ -22,6 +22,7 @@ from backend import app_bootstrap
 from backend.angel.auth import angel_session_manager
 from backend.angel.feed import angel_feed
 from backend.api.routes import (
+    admin_users,
     analytics,
     auth,
     broker,
@@ -31,6 +32,7 @@ from backend.api.routes import (
     options,
     share,
     strategies,
+    user_settings,
 )
 from backend.api.ws import router as ws_router
 from backend.broker import accounts
@@ -199,6 +201,8 @@ app.include_router(share.router)
 app.include_router(deployment.router)
 app.include_router(deployment.callback_router)
 app.include_router(ws_router)
+app.include_router(admin_users.router)
+app.include_router(user_settings.router)
 
 
 @app.get("/", tags=["meta"])

@@ -222,11 +222,22 @@ class FeedState:
         }
 
 
-def parse_frames(payload: Any) -> tuple[list[dict[str, Any]], list[str]]:
-    """Normalise one socket/REST message into ``(frames, unknown_symbols)``.
+class FyersFeed:
+    """Supervises one FYERS Data Socket and fans normalised quotes out."""
 
-    Accepts every shape FYERS uses: a flat tick dict (``symbol`` + ``ltp``), a
+    def __init__(self, provider: FyersProvider | None = None) -> None:
+        self.state = FeedState()
+        self._provider = provider
+        self._lock = threading.RLock()
+        self._socket_lock = threading.RLock()
+        self._subscriptions: dict[str, dict[str, str]] = {}  # token -> {exchange_segment}
+        self._thread: threading.Thread | None = None
+        self._stop = threading.Event()
+        self._subscribers: set[asyncio.Queue] = set()
+        self._loop: asyncio.AbstractEventLoop | None = None
+
     # -- socket callbacks -------------------------------------------------
+
     def _teardown(self, sock: Any = None) -> None:
         with self._socket_lock:
             target = sock if sock is not None else self._socket
@@ -406,6 +417,11 @@ def parse_frames(payload: Any) -> tuple[list[dict[str, Any]], list[str]]:
         self.state.frames_received += len(quotes)
         return len(quotes)
 
+
+def parse_frames(payload: Any) -> tuple[list[dict[str, Any]], list[str]]:
+    """Normalise one socket/REST message into ``(frames, unknown_symbols)``.
+
+    Accepts every shape FYERS uses: a flat tick dict (``symbol`` + ``ltp``), a
     nested ``{"data": {...}}`` wrapper, a ``{"d": [...]}`` quotes envelope, or
     raw JSON text. Control frames (subscribe acks, heartbeats) carry no price
     and are ignored rather than counted as ticks.

@@ -47,6 +47,12 @@ EXCHANGE_PREFIX = {
 #: The reverse map: the platform's segment name back to Angel's exchanger code.
 SEGMENT_EXCHANGE = {value: key for key, value in EXCHANGE_PREFIX.items()}
 
+#: Master token -> SmartAPI quote token for indices (Kotak Neo supplies
+#: different tokens for index quotes than for the instrument master).
+INDEX_QUOTE_TOKEN: dict[str, str] = {
+    "265": "99919000",  # SENSEX (BSE)
+}
+
 SYNC_INTERVAL_SECONDS = 12 * 60 * 60
 
 _lock = threading.RLock()
@@ -158,6 +164,16 @@ def to_record(record: dict[str, Any]) -> dict[str, Any] | None:
 # -------------------------------------------------------------------- sync
 
 
+#: Known indices that Angel One's scrip master may omit but the platform needs.
+KNOWN_INDICES: list[dict[str, Any]] = [
+    {"token": "26000", "exchange_segment": "nse_cm", "symbol": "NIFTY", "trading_symbol": "Nifty 50", "name": "Nifty 50", "is_index": 1},
+    {"token": "26009", "exchange_segment": "nse_cm", "symbol": "BANKNIFTY", "trading_symbol": "Nifty Bank", "name": "Nifty Bank", "is_index": 1},
+    {"token": "26037", "exchange_segment": "nse_cm", "symbol": "FINNIFTY", "trading_symbol": "Nifty Fin Services", "name": "Nifty Fin Services", "is_index": 1},
+    {"token": "26074", "exchange_segment": "nse_cm", "symbol": "MIDCPNIFTY", "trading_symbol": "NIFTY MID SELECT", "name": "NIFTY MID SELECT", "is_index": 1},
+    {"token": "265", "exchange_segment": "bse_cm", "symbol": "SENSEX", "trading_symbol": "SENSEX", "name": "S&P BSE SENSEX", "is_index": 1},
+]
+
+
 def _download(url: str) -> list[dict[str, Any]]:
     response = requests.get(url, timeout=180)
     response.raise_for_status()
@@ -214,6 +230,34 @@ def sync(*, url: str | None = None, segments: Iterable[str] | None = None) -> di
                 _upsert(cursor, record)
                 counts[record["exchange_segment"]] = counts.get(record["exchange_segment"], 0) + 1
             meta_set(cursor, "angel_instruments_synced_at", str(timestamp))
+
+            # Seed known indices that Angel One's scrip master may omit.
+            # These are inserted with source='angel' so quote lookups find them.
+            for idx in KNOWN_INDICES:
+                cursor.execute(
+                    "SELECT 1 FROM instruments WHERE token = ? AND exchange_segment = ? AND source = ?",
+                    (idx["token"], idx["exchange_segment"], SOURCE),
+                )
+                if cursor.fetchone():
+                    continue
+                cursor.execute(
+                    """
+                    INSERT INTO instruments (token, exchange_segment, symbol, trading_symbol, name, series,
+                                             expiry, option_type, strike, lot_size, tick_size, precision,
+                                             instrument_type, underlying, multiplier, is_index, source, updated_at)
+                    VALUES (?,?,?,?,?,?,NULL,NULL,NULL,1,0.05,2,'INDEX',?,1,1,?,?)
+                    """,
+                    (
+                        idx["token"],
+                        idx["exchange_segment"],
+                        idx["symbol"],
+                        idx["trading_symbol"],
+                        idx["name"],
+                        idx["symbol"],
+                        SOURCE,
+                        timestamp,
+                    ),
+                )
 
         _state.update({"status": "ready", "last_sync": timestamp, "error": None, "counts": counts})
         log.info("Angel instrument master synced: %s", counts)

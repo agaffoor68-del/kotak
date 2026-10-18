@@ -177,9 +177,33 @@ def _is_transient_blank(response: requests.Response) -> bool:
         json.loads(body)
     except ValueError:
         return True
-    return False
-
-
+def _is_transient_blank(response: requests.Response) -> bool:
+    """Return True if the response is a transient blank body that warrants a retry.
+    This covers HTTP 200 with an empty body, truncated JSON, or JSON that fails to parse.
+    It does NOT cover genuine rejections (WAF blocks) which return HTML content.
+    """
+    if response.status_code != 200:
+        return False
+    content_type = response.headers.get("content-type", "")
+    # Truncated JSON or empty body (application/json or missing) is transient
+    if content_type.startswith("application/json"):
+        try:
+            response.json()
+        except ValueError:
+            # Parse failed - could be truncated JSON or empty
+            return True
+        else:
+            # Valid JSON - not a blank
+            return False
+    # Non-JSON responses (text/html) are only transient if the body is empty
+    if content_type.startswith("text/html"):
+        # WAF rejection pages contain HTML content; treat as non-transient
+        if response.text.strip():
+            return False
+        # Empty HTML body is transient
+        return not response.text.strip()
+    # Other content types: treat empty as transient, non-empty as non-transient
+    return not response.text.strip()
 def _send_with_blank_retry(send: Callable[[], requests.Response], label: str) -> requests.Response:
     """Run one SmartAPI request, retrying the flaky "200 but no JSON" reply.
     Shared by login, refresh, profile and secured calls. The final response is

@@ -158,9 +158,20 @@ def fetch(
     """Fetch a live snapshot for `(token, exchange_segment)` pairs."""
     if not keys:
         return []
-    resolved = instruments.to_smartapi(keys)
+    # Resolve master-level tokens to broker-usable tokens.  Index instruments
+    # such as SENSEX expose a *different* symbol token on the quote API, so we
+    # translate the internal master token (→ `INDEX_QUOTE_TOKEN`) before the
+    # request is sent.
+    raw_resolved = instruments.to_smartapi(keys)
+    resolved: list[tuple[str, str, str]] = []
+    for token, symbol, segment in raw_resolved:
+        external_token = instruments.INDEX_QUOTE_TOKEN.get(token, token)
+        resolved.append((external_token, symbol, segment))
+
     if not resolved:
-        raise QuoteError("None of the requested instruments are in the Angel One master. Sync it first.")
+        raise QuoteError(
+            "None of the requested instruments are in the Angel One master. " "Sync it first."
+        )
 
     quotes: list[Quote] = []
     # Resolve tokens from the current OpenAPIScripMaster-backed instrument table,
@@ -177,7 +188,8 @@ def fetch(
         # request deliberately single-token and FULL to match the quote API
         # contract and avoid 400 responses from mixed/invalid payloads.
         payload = call(
-            "quotes", QUOTE_PATH,
+            "quotes",
+            QUOTE_PATH,
             payload={
                 "mode": "FULL",
                 "exchangeTokens": {

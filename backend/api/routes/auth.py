@@ -13,6 +13,22 @@ from backend.api.deps import CurrentUser, current_user, require_admin, require_t
 from backend.core.database import app_cursor, now, row_to_dict
 from backend.core.security import create_access_token, generate_api_key, hash_password, verify_password
 
+class RoleChangeRequest(BaseModel):
+    role: str = Field(..., description="New role: viewer, trader, or admin")
+
+    @field_validator("role")
+    @classmethod
+    def valid_role(cls, value: str) -> str:
+        if value not in {"admin", "trader", "viewer"}:
+            raise ValueError("role must be admin, trader or viewer")
+        return value
+
+
+class UserSettingsRequest(BaseModel):
+    whatsapp_number: str | None = Field(
+        default=None, max_length=20, description="WhatsApp number with country code, e.g. +919876543210"
+    )
+
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
@@ -177,3 +193,71 @@ def create_user(payload: RegisterRequest, user: CurrentUser = Depends(require_ad
             raise HTTPException(status.HTTP_409_CONFLICT, "That email is already registered") from error
         raise
     return {"id": user_id, "email": payload.email, "role": payload.role}
+
+
+@router.patch("/users/{user_id}/role")
+def update_user_role(
+    user_id: str,
+    payload: RoleChangeRequest,
+    user: CurrentUser = Depends(require_admin),
+) -> dict[str, Any]:
+    """Downgrade or change a user's role. Admin only.
+
+    Cannot downgrade yourself. A trader or viewer can only be downgraded to
+    viewer; an admin cannot be demoted through this endpoint (use the CLI or
+    database directly for admin demotions).
+    """
+    if user_id == user.id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "You cannot change your own role",
+        )
+
+    with app_cursor() as cursor:
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        target = row_to_dict(cursor.fetchone())
+        if target is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+
+        # Refuse to demote another admin via the API — too destructive.
+        if target["role"] == "admin":
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Cannot demote an admin through this endpoint",
+            )
+
+        cursor.execute(
+            "UPDATE users SET role = ? WHERE id = ?",
+            (payload.role, user_id),
+        )
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        updated = row_to_dict(cursor.fetchone())
+
+    return {
+        "id": updated["id"],
+        "email": updated["email"],
+        "role": updated["role"],
+        "is_active": bool(updated["is_active"]),
+    }
+
+
+@router.put("/users/me/settings")
+def update_user_settings(
+    payload: UserSettingsRequest,
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Save the current user's settings (e.g. WhatsApp number)."""
+    with app_cursor() as cursor:
+        cursor.execute(
+            "UPDATE users SET whatsapp_number = ? WHERE id = ?",
+            (payload.whatsapp_number, user.id),
+        )
+        cursor.execute("SELECT id, email, role, whatsapp_number FROM users WHERE id = ?", (user.id,))
+        updated = row_to_dict(cursor.fetchone())
+
+    return {
+        "id": updated["id"],
+        "email": updated["email"],
+        "role": updated["role"],
+        "whatsapp_number": updated.get("whatsapp_number"),
+    }

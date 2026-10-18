@@ -2,13 +2,15 @@
 
 /** Settings: system health, users, API keys and deployment (static IP + redirect). */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, getApiBase, loadToken } from "@/lib/api";
 import type { DeploymentReport, User } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { AppShell } from "@/components/app-shell";
-import { ErrorNote, Field, Loading, Panel, StatusChip } from "@/components/ui";
+import { ErrorNote, Field, Loading, Modal, Panel, StatusChip } from "@/components/ui";
 import { clock, num, relative } from "@/lib/format";
+
+type Toast = { id: string; kind: "success" | "error"; message: string };
 
 interface Health {
   status: string;
@@ -200,6 +202,9 @@ function Settings() {
   const [newUser, setNewUser] = useState({ email: "", password: "", role: "trader" });
   const [baseUrl, setBaseUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const [whatsappNumber, setWhatsappNumber] = useState(user?.whatsapp_number ?? "");
+  const [revokeConfirm, setRevokeConfirm] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -216,6 +221,16 @@ function Settings() {
     setBaseUrl(getApiBase());
     void load();
   }, [load]);
+
+  const toast = useMemo(() => (kind: "success" | "error", message: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts((prev) => [...prev, { id, kind, message }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   async function mintKey() {
     setBusy(true);
@@ -242,8 +257,61 @@ function Settings() {
     }
   }
 
+  async function saveSettings() {
+    setBusy(true);
+    try {
+      await api.updateSettings(whatsappNumber || null);
+      toast("success", "Settings saved");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not save settings");
+      toast("error", failure instanceof Error ? failure.message : "Could not save settings");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeAccess(targetUserId: string) {
+    setRevokeConfirm(null);
+    setBusy(true);
+    try {
+      await api.updateUserRole(targetUserId, "viewer");
+      setUsers(await api.listUsers());
+      toast("success", "Access revoked — user is now a viewer");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not revoke access");
+      toast("error", failure instanceof Error ? failure.message : "Could not revoke access");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      {/* Toast notifications */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`pointer-events-auto px-4 py-3 rounded-md shadow-pop text-sm min-w-[280px] ${
+              t.kind === "success" ? "border-up/40 bg-up/10 text-up" : "border-down/40 bg-down/10 text-down"
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5">{t.kind === "success" ? "✓" : "✕"}</span>
+              <p className="leading-relaxed">{t.message}</p>
+              <button
+                className="ml-2 opacity-60 hover:opacity-100"
+                onClick={() => dismissToast(t.id)}
+                type="button"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
         <p className="text-2xs text-ink-faint">System health, access control and connection settings</p>
@@ -350,6 +418,29 @@ function Settings() {
         </Panel>
       </div>
 
+      {/* Personal settings: WhatsApp number */}
+      <Panel title="Your settings" subtitle="Notification preferences">
+        <Field label="WhatsApp number" hint="Include country code, e.g. +919876543210">
+          <input
+            className="field-input"
+            type="tel"
+            placeholder="+919876543210"
+            value={whatsappNumber}
+            onChange={(event) => setWhatsappNumber(event.target.value)}
+          />
+        </Field>
+        <div className="flex items-end">
+          <button
+            className="btn btn-primary"
+            onClick={() => void saveSettings()}
+            disabled={busy}
+            type="button"
+          >
+            {busy ? "Saving…" : "Save settings"}
+          </button>
+        </div>
+      </Panel>
+
       {user?.role === "admin" ? (
         <Panel title="Users" subtitle="Role-based access control">
           <table className="tbl">
@@ -358,6 +449,7 @@ function Settings() {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -368,6 +460,18 @@ function Settings() {
                     <span className="chip chip-idle">{row.role}</span>
                   </td>
                   <td>{row.is_active ? <StatusChip status="live" label="active" /> : <StatusChip status="idle" label="disabled" />}</td>
+                  <td>
+                    {row.role === "trader" && row.id !== user.id ? (
+                      <button
+                        className="btn btn-sm btn-ghost text-down"
+                        onClick={() => setRevokeConfirm(row.id)}
+                        type="button"
+                        disabled={busy}
+                      >
+                        Revoke access
+                      </button>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -424,6 +528,36 @@ function Settings() {
           Sign out of this device
         </button>
       </Panel>
+
+      {/* Revoke access confirmation modal */}
+      <Modal
+        open={revokeConfirm !== null}
+        title="Revoke access"
+        onClose={() => setRevokeConfirm(null)}
+      >
+        <p className="text-2xs leading-relaxed text-ink">
+          Downgrading this user to <strong>"viewer"</strong> removes their ability to place orders or
+          create API keys. They will still be able to view market data and portfolios. This cannot be
+          undone from this screen — an admin must re-assign a role.
+        </p>
+        <div className="flex justify-end gap-2 border-t border-hairline px-4 py-3">
+          <button
+            className="btn btn-sm btn-ghost"
+            onClick={() => setRevokeConfirm(null)}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            className="btn btn-sm btn-primary"
+            onClick={() => void revokeAccess(revokeConfirm!)}
+            disabled={busy}
+            type="button"
+          >
+            {busy ? "Revoking…" : "Confirm revoke"}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

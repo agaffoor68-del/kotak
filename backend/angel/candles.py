@@ -32,8 +32,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from backend.core.config import settings
-from backend.core.database import market_cursor
+from backend.core.database import app_cursor
 from backend.marketdata import ticks
+from backend.angel.instruments import SEGMENT_EXCHANGE
 from backend.angel.ratelimit import angel_limiter
 
 log = logging.getLogger("alphatrade.angel.candles")
@@ -151,6 +152,27 @@ def normalise_rows(rows: Any) -> list[dict[str, Any]]:
     return candles
 
 
+def format_candles(candles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Reduce internal candle dicts to the shape the API/UI contract expects.
+
+    The chart, indicators and backtester consume exactly
+    ``{time, open, high, low, close, volume}`` — nothing more. Internal rows also
+    carry ``trades``, and the store may hand back numpy-ish numeric types; both
+    are normalised here so JSON serialisation never surprises a client.
+    """
+    return [
+        {
+            "time": int(candle["time"]),
+            "open": float(candle["open"]),
+            "high": float(candle["high"]),
+            "low": float(candle["low"]),
+            "close": float(candle["close"]),
+            "volume": float(candle.get("volume") or 0),
+        }
+        for candle in candles
+    ]
+
+
 def _call_historical(
     call: Callable[..., dict[str, Any]],
     *,
@@ -160,13 +182,18 @@ def _call_historical(
     interval: str,
     start: datetime,
     end: datetime,
+    is_index: bool = False,
 ) -> list[dict[str, Any]]:
+    # SmartAPI wants a JSON body (not query params) for getCandleData.
+    # Index candles need a `999`-prefixed symboltoken and exchange "NSE".
+    exchange = "NSE" if is_index else SEGMENT_EXCHANGE.get(segment, "NSE")
+    symboltoken = f"999{token}" if is_index else str(token)
     payload = call(
         "historical",
         HISTORICAL_PATH,
-        params={
-            "exchange": segment,
-            "symboltoken": str(token),
+        payload={
+            "exchange": exchange,
+            "symboltoken": symboltoken,
             "interval": interval,
             "fromdate": _format(start),
             "todate": _format(end),
@@ -210,7 +237,8 @@ def fetch(
         span = max(1, min(int(span), settings.angel_history_days_max))
         start = end - timedelta(days=span)
 
-    symbol = _symbol_for(token, exchange_segment) or str(token)
+    symbol, is_index = _symbol_for(token, exchange_segment)
+    symbol = symbol or str(token)
     chunk = CHUNK_DAYS.get(interval, 30)
 
     merged: dict[float, dict[str, Any]] = {}
@@ -223,7 +251,7 @@ def fetch(
         try:
             rows = _call_historical(
                 call, token=str(token), segment=exchange_segment, symbol=symbol,
-                interval=angel_interval, start=cursor, end=stop,
+                interval=angel_interval, start=cursor, end=stop, is_index=is_index,
             )
         except CandleError:
             raise
@@ -237,18 +265,22 @@ def fetch(
     return candles
 
 
-def _symbol_for(token: str, exchange_segment: str) -> str | None:
-    with market_cursor() as cursor:
+def _symbol_for(token: str, exchange_segment: str) -> tuple[str | None, bool]:
+    """Return (broker_symbol, is_index) for the token.
+
+    The broker symbol is the ``exch_seg:trading_symbol`` string SmartAPI wants
+    in payloads. `is_index` tells callers whether to prefix the token with `999`.
+    """
+    with app_cursor() as cursor:
         cursor.execute(
-            "SELECT trading_symbol FROM instruments WHERE token = ? AND exchange_segment = ?",
+            "SELECT trading_symbol, is_index FROM instruments WHERE token = ? AND exchange_segment = ?",
             (str(token), exchange_segment),
         )
         row = cursor.fetchone()
     if row is None:
-        return None
-    from backend.angel.instruments import SEGMENT_EXCHANGE
-
-    return f"{SEGMENT_EXCHANGE.get(exchange_segment, 'NSE')}:{row['trading_symbol']}"
+        return None, False
+    exchange = SEGMENT_EXCHANGE.get(exchange_segment, "NSE")
+    return f"{exchange}:{row['trading_symbol']}", bool(row["is_index"])
 
 
 def _window(

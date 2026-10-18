@@ -180,6 +180,9 @@ def get_candles(
     except angel_candles.CandleError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
 
+    # Map to the exact contract the chart/indicator layer expects:
+    # [{time, open, high, low, close, volume}, ...].
+    candles = angel_candles.format_candles(candles)
     coverage = ticks.coverage(token, exchange_segment)
     return {
         "token": token,
@@ -190,6 +193,11 @@ def get_candles(
         "count": len(candles),
         "cached": from_cache,
         "coverage": coverage,
+        "note": (
+            "No recorded candles for this instrument yet. The store fills on the first "
+            "fetch and on every feed reconnect; check the Angel session if this persists."
+            if not candles else None
+        ),
     }
 
 

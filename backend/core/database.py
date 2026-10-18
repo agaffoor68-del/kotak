@@ -98,6 +98,12 @@ def _migrate_app_schema() -> None:
         instrument_columns = {row["name"] for row in cursor.fetchall()}
         if "source" not in instrument_columns:
             cursor.execute("ALTER TABLE instruments ADD COLUMN source TEXT NOT NULL DEFAULT 'kotak'")
+
+    with app_cursor() as cursor:
+        cursor.execute("PRAGMA table_info(users)")
+        user_columns = {row["name"] for row in cursor.fetchall()}
+        if "whatsapp_number" not in user_columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN whatsapp_number TEXT")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_instruments_source ON instruments(source)")
 
     with app_cursor() as cursor:

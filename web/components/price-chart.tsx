@@ -70,7 +70,17 @@ export function PriceChart({
     return () => observer.disconnect();
   }, []);
 
-  const series = useMemo(() => buildSeries(candles, style, renkoSize), [candles, style, renkoSize]);
+const transformedCandles = useMemo(() => {
+  return candles.map(c => ({
+    timestamp: c.time ?? c.timestamp,
+    open: c.open,
+    high: c.high,
+    low: c.low,
+    close: c.close,
+    volume: c.volume,
+    trades: c.trades ?? 0
+  }));
+}, [candles]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -115,8 +125,8 @@ export function PriceChart({
           setCursor({ x: event.clientX - rect.left, y: event.clientY - rect.top });
         }}
         onMouseLeave={() => setCursor(null)}
-        role="img"
         aria-label={title ? `${title} price chart` : "Price chart"}
+
       />
 
       {hover ? (

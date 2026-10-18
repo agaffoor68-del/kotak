@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /** Market watch: instrument search, live watchlist and a multi-style chart. */
 
@@ -164,7 +164,7 @@ function MarketWatch() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold tracking-tight">Market watch</h1>
-          <p className="text-2xs text-ink-faint">Live Angel One SmartAPI quotes · historical candles from SmartAPI</p>
+          <p className="text-2xs text-ink-faint">Live Angel One SmartAPI quotes Â· historical candles from SmartAPI</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select className="field-select w-auto" value={interval} onChange={(event) => setInterval(event.target.value)}>
@@ -209,7 +209,7 @@ function MarketWatch() {
                       <span className="shrink-0 text-right">
                         <span className="num block text-xs">{num(quote?.last)}</span>
                         <span className={`num block text-3xs ${toneClass(quote?.change_percent)}`}>
-                          {quote ? percent(quote.change_percent) : "—"}
+                          {quote ? percent(quote.change_percent) : "â€”"}
                         </span>
                       </span>
                     </button>
@@ -223,7 +223,7 @@ function MarketWatch() {
             <Field label="Search">
               <input
                 className="field-input"
-                placeholder="RELIANCE, INFY, HDFCBANK…"
+                placeholder="RELIANCE, INFY, HDFCBANKâ€¦"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -262,10 +262,10 @@ function MarketWatch() {
         {/* ---------------- chart ---------------- */}
         <div className="space-y-4 xl:col-span-3">
           <Panel
-            title={selected ? `${selected.instrument.symbol} · ${interval}` : "Chart"}
+            title={selected ? `${selected.instrument.symbol} Â· ${interval}` : "Chart"}
             subtitle={
               live
-                ? `last ${num(live.last)} · ${percent(live.change_percent)} · tick ${relative(live.updated_at)} ago`
+                ? `last ${num(live.last)} Â· ${percent(live.change_percent)} Â· tick ${relative(live.updated_at)} ago`
                 : "waiting for a tick"
             }
             actions={
@@ -295,8 +295,7 @@ function MarketWatch() {
               <Empty
                 title="No recorded candles for this instrument"
                 message={
-                  coverage?.note ??
-                  "Candles come from Angel One SmartAPI. Kotak Neo publishes no historical candles, which is why the platform reads its market data from Angel."
+                   "Candles come from Angel One SmartAPI. Kotak Neo publishes no historical candles, which is why the platform reads its market data from Angel."
                 }
               />
             )}
@@ -306,9 +305,9 @@ function MarketWatch() {
             <Panel title="Data provenance" subtitle="What this chart is actually built from">
               <dl className="grid gap-2 text-2xs sm:grid-cols-4">
                 <Stat label="Ticks recorded" value={num(coverage.ticks, 0)} />
-                <Stat label="First tick" value={coverage.first_tick ? new Date(coverage.first_tick * 1000).toLocaleDateString("en-IN") : "—"} />
-                <Stat label="Last tick" value={coverage.last_tick ? relative(coverage.last_tick) : "—"} />
-                <Stat label="Span" value={coverage.span_seconds > 0 ? `${Math.round(coverage.span_seconds / 60)} min` : "—"} />
+                <Stat label="First tick" value={coverage.first_tick ? new Date(coverage.first_tick * 1000).toLocaleDateString("en-IN") : "â€”"} />
+                <Stat label="Last tick" value={coverage.last_tick ? relative(coverage.last_tick) : "â€”"} />
+                <Stat label="Span" value={coverage.span_seconds > 0 ? `${Math.round(coverage.span_seconds / 60)} min` : "â€”"} />
               </dl>
               <p className="mt-3 border-t border-hairline pt-3 text-3xs leading-relaxed text-ink-faint">
                 {coverage.note}
@@ -339,7 +338,7 @@ function QuoteDetail({ token, segment }: { token: string; segment: string }) {
         <Stat label="Volume" value={compactInt(quote.volume)} />
         <Stat label="Open interest" value={compactInt(quote.open_interest)} />
         <Stat label="VWAP" value={num(quote.average_price)} />
-        <Stat label="IV" value={quote.implied_volatility ? `${num(quote.implied_volatility)}%` : "—"} />
+        <Stat label="IV" value={quote.implied_volatility ? `${num(quote.implied_volatility)}%` : "â€”"} />
         <Stat label="Upper circuit" value={num(quote.upper_circuit)} />
         <Stat label="Lower circuit" value={num(quote.lower_circuit)} />
       </dl>
@@ -390,3 +389,4 @@ export default function MarketPage() {
     </AppShell>
   );
 }
+
