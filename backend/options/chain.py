@@ -26,6 +26,42 @@ RISK_FREE_RATE = 0.065
 MIN_SIGMA_SQ = 1e-4
 
 
+STRIKE_INTERVALS = {"NIFTY": 50.0, "BANKNIFTY": 100.0, "SENSEX": 100.0}
+
+
+def strike_interval(underlying: str) -> float:
+    """Return the exchange strike step for a supported index."""
+    name = underlying.upper().replace(" ", "")
+    return STRIKE_INTERVALS.get(name, 50.0)
+
+
+def calculate_strike(
+    spot_price: float,
+    strike_type: str,
+    option_type: str,
+    offset: int | float = 0,
+    *,
+    interval: float = 50.0,
+) -> float:
+    """Select an exact ITM/ATM/OTM strike from the underlying spot.
+
+    ``offset`` is measured in strike intervals, not rupees. For example, an
+    ATM NIFTY call with offset=2 is ATM; an OTM call is ATM + 2 * interval.
+    """
+    if spot_price <= 0 or interval <= 0 or offset < 0:
+        raise ValueError("spot_price, interval and offset must be positive")
+    kind = strike_type.upper()
+    side = option_type.upper()
+    if kind not in {"ITM", "ATM", "OTM"} or side not in {"CE", "PE", "CALL", "PUT"}:
+        raise ValueError("strike_type must be ITM, ATM or OTM and option_type must be CE/PE")
+    atm = round(spot_price / interval) * interval
+    if kind == "ATM":
+        return float(atm)
+    is_call = side in {"CE", "CALL"}
+    direction = 1 if (kind == "OTM") == is_call else -1
+    return float(atm + direction * int(offset) * interval)
+
+
 def norm_cdf(x: float) -> float:
     """Standard normal CDF via the error function."""
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
@@ -157,6 +193,7 @@ def build_chain(
     quote_lookup,
     now_ts: float,
     target_expiry: str | None = None,
+    strike_filter: set[float] | None = None,
 ) -> dict[str, Any]:
     """Assemble a full option chain.
 
@@ -193,6 +230,8 @@ def build_chain(
 
     rows_by_strike = by_expiry.get(expiry) or {}
     strikes = sorted(float(strike) for strike in rows_by_strike)
+    if strike_filter is not None:
+        strikes = [strike for strike in strikes if strike in strike_filter]
     if not strikes:
         return {
             "expiries": expiries, "rows": [], "spot": spot,

@@ -26,6 +26,7 @@ from backend.execution import order_service
 from backend.marketdata import master, ticks
 from backend.marketdata.market_hours import is_market_open, session_state
 from backend.marketdata.quotes import quote_engine
+from backend.options.chain import calculate_strike, strike_interval
 from backend.papertrading import engine as paper
 from backend.risk.engine import RiskEngine, RiskViolation
 from backend.strategies import dsl
@@ -266,6 +267,16 @@ class AlgoSupervisor:
         price = float(bar.get("close") or 0)
         if price <= 0:
             return
+
+        # Optional strategy settings. Example:
+        # {"options": {"underlying": "NIFTY", "strike_type": "OTM",
+        #  "option_type": "CE", "offset": 2, "expiry": "2026-10-29"}}
+        # The selected contract is resolved from the synced master, never guessed.
+        instrument = _resolve_option_instrument(definition, instrument, price)
+        if instrument is None:
+            run.note("option contract missing from instrument master; skipped")
+            return
+
         risk = definition.get("risk") or {}
         equity = paper.capital(run.account_id) if run.mode == "paper" else None
         quantity = dsl.position_size(definition, equity or 0, price)
@@ -313,6 +324,28 @@ class AlgoSupervisor:
                 run.note("live exit requires an explicit closing order; none sent automatically")
         except Exception as error:  # noqa: BLE001
             run.note(f"close failed: {error}")
+
+
+def _resolve_option_instrument(definition: dict[str, Any], fallback: dict[str, Any], spot: float) -> dict[str, Any] | None:
+    options = definition.get("options") or {}
+    if not options:
+        return fallback
+    underlying = str(options.get("underlying") or fallback.get("label") or "").upper()
+    option_type = str(options.get("option_type") or "CE").upper()
+    strike_type = str(options.get("strike_type") or "ATM").upper()
+    offset = int(options.get("offset") or 0)
+    strike = calculate_strike(spot, strike_type, option_type, offset, interval=strike_interval(underlying))
+    contracts = master.option_contracts(underlying, fallback.get("exchange_segment", "nse_fo"), options.get("expiry"))
+    expiry = options.get("expiry") or (contracts.get("expiries") or [None])[0]
+    entry = (contracts.get("rows") or {}).get(expiry, {}).get(strike)
+    if not entry:
+        entry = next((value for key, value in (contracts.get("rows") or {}).get(expiry, {}).items() if float(key) == strike), None)
+    leg = (entry or {}).get("call" if option_type in {"CE", "CALL"} else "put") or {}
+    if not leg.get("token"):
+        return None
+    return {**fallback, "instrument_token": str(leg["token"]), "label": leg.get("trading_symbol"),
+            "exchange_segment": leg.get("exchange_segment") or fallback.get("exchange_segment", "nse_fo"),
+            "strike": strike, "option_type": option_type, "strike_type": strike_type, "offset": offset}
 
 
 def _session_call(account_id: str):
