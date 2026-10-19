@@ -52,6 +52,17 @@ function OptionDesk() {
   }, [load]);
 
   const summary = chain?.summary;
+  const marketIsPreOpen = Boolean(
+    chain?.has_data &&
+      chain.rows.length > 0 &&
+      chain.rows.every(
+        (row) =>
+          (row.call.open_interest ?? 0) === 0 &&
+          (row.put.open_interest ?? 0) === 0 &&
+          (row.call.volume ?? 0) === 0 &&
+          (row.put.volume ?? 0) === 0,
+      ),
+  );
 
   return (
     <div className="space-y-4">
@@ -140,6 +151,12 @@ function OptionDesk() {
               </dl>
             </Panel>
           </div>
+
+          {marketIsPreOpen ? (
+            <div className="rounded border border-warn/40 bg-warn-soft px-3 py-2 text-sm text-warn" role="status">
+              Market Open hone ka wait karein — PRE-OPEN mein Angel One OI aur volume zero de sakta hai.
+            </div>
+          ) : null}
 
           <Panel
             title={`${underlying} ${chain.expiry ?? "chain"}`}

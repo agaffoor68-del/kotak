@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+import traceback
 from typing import Any, Callable, Iterable
 
 from backend.core.config import settings
@@ -181,16 +182,24 @@ def fetch(
     quotes: list[Quote] = []
     mode = MODE_MAP.get(quote_type.lower(), "FULL")
 
-    # Group resolved tokens by exchange (e.g. "NFO", "NSE", "BSE")
+    # Group resolved tokens by exchange (e.g. "NFO", "NSE", "BSE").
+    # Log the resolved symbol/token mapping so a bad instrument-master row is visible.
+    for ext_token, symbol, segment in resolved:
+        log.info(
+            "Angel option token mapping: segment=%s exchange=%s token=%s symbol=%s",
+            segment,
+            instruments.SEGMENT_EXCHANGE.get(segment, "NSE"),
+            ext_token,
+            symbol,
+        )
     by_exchange: dict[str, list[tuple[str, str, str]]] = {}
     for entry in resolved:
         ext_token, symbol, segment = entry
         exchange = instruments.SEGMENT_EXCHANGE.get(segment, "NSE")
         by_exchange.setdefault(exchange, []).append(entry)
 
-    # Angel One rate limiting: maximum 3 requests per second across all endpoints.
-    # We batch up to 40 tokens per request and pause 0.35s between requests (1/0.35 = 2.85 req/sec).
-    BATCH_SIZE = min(40, settings.angel_max_tokens_per_call)
+    # Angel One quote requests are batched to no more than 50 tokens.
+    BATCH_SIZE = min(50, settings.angel_max_tokens_per_call)
 
     for exchange, exchange_entries in by_exchange.items():
         # Chunk into batches of up to BATCH_SIZE
@@ -198,22 +207,38 @@ def fetch(
             chunk = exchange_entries[i:i + BATCH_SIZE]
             token_list = [entry[0] for entry in chunk]
 
-            # Enforce 3 req/sec rate limit before every call
+            # Enforce the broker rate limit before every call.
             time.sleep(0.35)
+            request_payload = {
+                "mode": mode,
+                "exchangeTokens": {exchange: token_list},
+            }
+            log.info(
+                "Angel SmartAPI option quote request: mode=%s exchange=%s tokens=%s payload=%s",
+                mode,
+                exchange,
+                len(token_list),
+                request_payload,
+            )
 
             try:
                 payload = call(
                     "quotes",
                     QUOTE_PATH,
-                    payload={
-                        "mode": mode,
-                        "exchangeTokens": {
-                            exchange: token_list,
-                        },
-                    },
+                    payload=request_payload,
                     http_method="POST",
                 )
+                log.info("Angel SmartAPI raw option quote response: %s", payload)
+                if isinstance(payload, dict) and payload.get("success") is False:
+                    log.error("Angel SmartAPI rejected option quote request: %s", payload)
             except Exception as error:
+                log.error(
+                    "Angel SmartAPI option quote call failed: exchange=%s tokens=%s error=%s",
+                    exchange,
+                    token_list,
+                    error,
+                )
+                traceback.print_exc()
                 # If HTTP 429 occurs, backoff and retry once
                 err_str = str(error)
                 if "429" in err_str or "Too Many Requests" in err_str:
@@ -223,14 +248,10 @@ def fetch(
                         payload = call(
                             "quotes",
                             QUOTE_PATH,
-                            payload={
-                                "mode": mode,
-                                "exchangeTokens": {
-                                    exchange: token_list,
-                                },
-                            },
+                            payload=request_payload,
                             http_method="POST",
                         )
+                        log.info("Angel SmartAPI raw retry response: %s", payload)
                     except Exception as retry_err:
                         log.error("Retry failed for chunk %s on %s: %s", token_list, exchange, retry_err)
                         continue

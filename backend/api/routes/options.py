@@ -27,8 +27,8 @@ log = logging.getLogger("alphatrade.api.options")
 
 router = APIRouter(prefix="/api/v1/options", tags=["options"])
 
-#: How many contracts are priced per batch before the next SmartAPI call.
-_QUOTE_BATCH = 20
+#: SmartAPI accepts at most 50 exchange tokens in one quote request.
+_QUOTE_BATCH = 50
 
 
 def get_nearest_future_expiry(underlying: str, exchange_segment: str = "nse_fo") -> str | None:
@@ -206,8 +206,10 @@ def option_chain(
             if tok:
                 token_keys_to_fetch.append((str(tok), seg))
 
-    # De-duplicate token keys
+    # De-duplicate token keys and log the exact NFO mapping before SmartAPI.
     unique_keys = list(dict.fromkeys(token_keys_to_fetch))
+    for token, segment in unique_keys:
+        log.info("Option chain mapped contract: underlying=%s segment=%s exchange=%s token=%s", underlying, segment, segment.upper(), token)
 
     # 4. Fetch live quotes via Angel One SmartAPI in rate-limited batches
     fetch_error = None
@@ -220,7 +222,7 @@ def option_chain(
                 token_to_quote_map[str(q.token)] = q
         except Exception as error:
             fetch_error = str(error)
-            log.warning("Option chain quotes fetch error for %s: %s", underlying, error)
+            log.exception("Option chain quotes fetch error for %s", underlying)
 
     def quote_lookup(token: str, segment: str):
         if not token:
