@@ -199,7 +199,8 @@ def fetch(
         by_exchange.setdefault(exchange, []).append(entry)
 
     # Angel One quote requests are batched to no more than 50 tokens.
-    BATCH_SIZE = min(50, settings.angel_max_tokens_per_call)
+    # SmartAPI's quote endpoint accepts at most 50 tokens per request.
+    BATCH_SIZE = 50
 
     for exchange, exchange_entries in by_exchange.items():
         # Chunk into batches of up to BATCH_SIZE

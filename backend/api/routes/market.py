@@ -112,6 +112,34 @@ def list_futures(
     return master.futures(exchange_segment)
 
 
+class HistoryDownloadRequest(BaseModel):
+    symbol_token: str = Field(min_length=1, max_length=32)
+    exchange: str = Field(default="NSE")
+    interval: str = Field(default="FIVE_MINUTE")
+    days: int = Field(default=5, ge=1, le=1800)
+
+
+@router.post("/download-history")
+def download_history(
+    payload: HistoryDownloadRequest,
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Download and persist Angel candles for manual backtest preparation."""
+    try:
+        candles = angel_candles.fetch_and_save_historical_candles(
+            angel_call(user), payload.symbol_token, payload.exchange,
+            payload.interval, payload.days,
+        )
+    except angel_candles.CandleError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+    return {
+        "status": "ok", "symbol_token": payload.symbol_token,
+        "exchange": payload.exchange, "interval": payload.interval,
+        "days": payload.days, "count": len(candles),
+        "candles": angel_candles.format_candles(candles),
+    }
+
+
 class QuoteRequestModel(BaseModel):
     """A batch quote request."""
 

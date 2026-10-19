@@ -409,6 +409,31 @@ def incremental(
     return ticks.history(token, exchange_segment, interval, limit)
 
 
+def fetch_and_save_historical_candles(
+    call: Callable[..., dict[str, Any]],
+    symbol_token: str,
+    exchange: str,
+    interval: str = "FIVE_MINUTE",
+    days: int = 5,
+) -> list[dict[str, Any]]:
+    """Fetch Angel history and persist it for backtests.
+
+    ``exchange`` may be an Angel exchange (NSE/NFO/BSE/BFO) or an internal
+    segment (nse_cm/nse_fo/bse_cm/bse_fo). The public helper accepts Angel's
+    interval names while the storage layer uses the platform's short names.
+    """
+    segment = exchange.lower() if exchange.lower() in SEGMENT_EXCHANGE else {
+        "NSE": "nse_cm", "NFO": "nse_fo", "BSE": "bse_cm", "BFO": "bse_fo",
+    }.get(exchange.upper(), exchange.lower())
+    platform_interval = next((key for key, value in INTERVAL_MAP.items() if value == interval), interval)
+    if platform_interval not in INTERVAL_MAP:
+        raise CandleError(f"Unsupported Angel interval '{interval}'")
+    candles = fetch(call, str(symbol_token), segment, platform_interval, days=max(1, int(days)))
+    stored = store(str(symbol_token), segment, platform_interval, candles)
+    log.info("Saved %s historical candles for %s/%s (%s rows)", stored, symbol_token, segment, len(candles))
+    return candles
+
+
 def store(token: str, exchange_segment: str, interval: str, candles: list[dict[str, Any]]) -> int:
     """Persist SmartAPI candles into the shared candle store."""
     if interval not in ticks.INTERVAL_SECONDS or not candles:

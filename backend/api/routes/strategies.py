@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from backend.api.deps import CurrentUser, current_user, require_trader, resolve_account_id
+from backend.api.deps import CurrentUser, angel_call, current_user, require_trader, resolve_account_id
+from backend.angel import candles as angel_candles
 from backend.backtesting import engine
 from backend.core.config import settings
 from backend.core.database import app_cursor, now, row_to_dict
@@ -21,6 +23,7 @@ from backend.strategies.indicators import available
 from backend.strategies.templates import TEMPLATES
 
 router = APIRouter(prefix="/api/v1/strategies", tags=["strategies"])
+log = logging.getLogger("alphatrade.api.strategies")
 
 
 class StrategyRequest(BaseModel):
@@ -36,6 +39,7 @@ class BacktestRequest(BaseModel):
     initial_capital: float = Field(default=500_000.0, gt=0)
     slippage: str = Field(default="moderate")
     timeframe: str | None = None
+    history_days: int = Field(default=5, ge=1, le=1800)
 
 
 class StartRunRequest(BaseModel):
@@ -312,6 +316,16 @@ def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)
         token = str(item["token"])
         segment = item.get("exchange_segment", "nse_cm")
         candles = ticks.history(token, segment, interval, 5000)
+        if not candles:
+            try:
+                candles = angel_candles.fetch_and_save_historical_candles(
+                    angel_call(user), token, segment,
+                    angel_candles.INTERVAL_MAP[interval],
+                    payload.history_days,
+                )
+            except Exception as error:  # noqa: BLE001 - surfaced in coverage/result
+                log.warning("Automatic history download failed for %s/%s: %s", token, segment, error)
+                candles = []
         instrument = master.get_instrument(token, segment)
         label = (item.get("label") or (instrument or {}).get("name") or token)
         candles_by_symbol[label] = candles
