@@ -1,25 +1,27 @@
 """Event-driven backtester.
 
-Runs a :mod:`backend.strategies.dsl` document over recorded candles, with
+Runs a :mod:`backend.strategies.dsl` document over durable OHLCV candles, with
 realistic Indian charges, configurable slippage, and no look-ahead: a signal
 evaluated on bar *i* can only fill on bar *i+1* at that bar's open or worse.
 
-**Data provenance matters here.** Kotak Neo publishes no historical candles, so
-`candles` must come from the platform's own tick recording
-(:mod:`backend.marketdata.ticks`). If the series is too short for the strategy's
-warm-up, the backtest refuses to invent history and says so.
+Historical bars are database-first.  An empty series is hydrated from
+``yfinance`` by the historical loader; Angel One is a rate-limited fallback
+owned by that loader, never a normal backtest data source.
 """
 
 from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from backend.analytics import metrics
 from backend.execution.charges import compute as compute_charges
+from backend.marketdata import ticks
 from backend.marketdata.ticks import INTERVAL_SECONDS
+from backend.marketdata.yf_historical_loader import HistoricalDataError, default_backtest_window, download_yf_data
 from backend.strategies import dsl
 
 log = logging.getLogger("alphatrade.backtest")
@@ -131,6 +133,34 @@ def _apply_slippage(price: float, side: str, rate: float) -> float:
     return round(price * multiplier, 2)
 
 
+def load_history(
+    token: str,
+    exchange_segment: str,
+    interval: str,
+    *,
+    limit: int = 5000,
+    angel_call: Callable[..., dict[str, Any]] | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Read durable candles, hydrating an empty series through yfinance.
+
+    The engine never invokes a broker method. The injected callback is consumed
+    only by the loader after yfinance fails, where Angel's shared limiter is
+    enforced.
+    """
+    stored = ticks.stored_history(token, exchange_segment, interval, limit)
+    if stored:
+        return stored
+    start, end = (start_date, end_date) if start_date and end_date else default_backtest_window(interval)
+    try:
+        download_yf_data(token, interval, start, end, exchange_segment=exchange_segment, angel_call=angel_call)
+    except HistoricalDataError as error:
+        log.warning("Historical hydration failed for %s %s: %s", token, interval, error)
+        return []
+    return ticks.stored_history(token, exchange_segment, interval, limit)
+
+
 def run(
     definition: dict[str, Any],
     candles_by_symbol: dict[str, list[dict[str, Any]]],
@@ -160,8 +190,7 @@ def run(
         return BacktestResult(
             status="no_data",
             note=(
-                "No recorded candles for this strategy's universe. Kotak Neo does not provide "
-                "historical data, so history begins when the market feed starts recording."
+                "No historical candles are available for this strategy's universe."
             ),
         )
 
@@ -185,8 +214,7 @@ def run(
         return BacktestResult(
             status="no_data", warnings=warnings,
             note=(
-                f"Every instrument has fewer than {required} recorded bars, which is the warm-up "
-                f"this strategy needs. Keep the feed recording and try again."
+                f"Every instrument has fewer than {required} bars, which is the warm-up this strategy needs."
             ),
         )
 
@@ -339,9 +367,7 @@ def run(
         equity_points=equity_points, drawdown_curve=metrics.drawdown_series(equity_curve),
         bars=bars, warnings=warnings,
         note=(
-            f"Backtested {bars} bars across {len(tradable)} instrument(s) using candles recorded "
-            f"by this platform. Kotak Neo publishes no historical data, so results cover only the "
-            f"recorded period."
+            f"Backtested {bars} bars across {len(tradable)} instrument(s) using persisted historical candles."
         ),
     )
 

@@ -263,6 +263,40 @@ def history(token: str, exchange_segment: str, interval: str, limit: int = 500) 
     return candles[-max(1, min(limit, 5000)):]
 
 
+def stored_history(token: str, exchange_segment: str, interval: str, limit: int = 5000) -> list[dict[str, Any]]:
+    """Read persisted OHLCV bars, including yfinance/Angel backfills.
+
+    This deliberately does not replace :func:`history`: the latter is the
+    live-tape view built from ticks.  Backtests need the durable candle store,
+    whose rows may predate the process starting.
+    """
+    if interval not in INTERVAL_SECONDS:
+        raise ValueError(f"Unsupported interval {interval!r}; expected one of {sorted(INTERVAL_SECONDS)}")
+    capped_limit = max(1, min(int(limit), 50_000))
+    with market_cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT bucket, open, high, low, close, volume, trades
+            FROM candles
+            WHERE token = ? AND exchange_segment = ? AND interval = ?
+            ORDER BY bucket DESC
+            LIMIT ?
+            """,
+            (str(token), exchange_segment, interval, capped_limit),
+        )
+        rows = cursor.fetchall()
+    seconds = INTERVAL_SECONDS[interval]
+    return [
+        {
+            "time": row["bucket"] * seconds,
+            "open": row["open"], "high": row["high"], "low": row["low"],
+            "close": row["close"], "volume": row["volume"] or 0,
+            "trades": row["trades"] or 0,
+        }
+        for row in reversed(rows)
+    ]
+
+
 def coverage(token: str, exchange_segment: str) -> dict[str, Any]:
     """How much real history exists for an instrument — surfaced in the UI."""
     with market_cursor() as cursor:

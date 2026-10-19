@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from backend.api.deps import CurrentUser, angel_call, current_user, require_trader, resolve_account_id
-from backend.angel import candles as angel_candles
 from backend.backtesting import engine
 from backend.core.config import settings
 from backend.core.database import app_cursor, now, row_to_dict
@@ -287,7 +286,7 @@ def promote_strategy(
 
 @router.post("/backtest")
 def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
-    """Backtest a strategy over candles recorded by this platform."""
+    """Backtest a strategy over persisted historical candles."""
     if not settings.enable_backtest:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Backtesting is disabled.")
 
@@ -315,15 +314,18 @@ def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)
     for item in definition.get("universe") or []:
         token = str(item["token"])
         segment = item.get("exchange_segment", "nse_cm")
-        # Backtests are deterministic and offline: history must be prefetched
-        # through /market/prefetch-data, never fetched from SmartAPI here.
-        candles = ticks.history(token, segment, interval, 5000)
+        # Resolve Angel credentials lazily: a normal database/yfinance
+        # backtest must not require any broker account.
+        candles = engine.load_history(
+            token, segment, interval, limit=5000,
+            angel_call=lambda *args, **kwargs: angel_call(user)(*args, **kwargs),
+        )
         instrument = master.get_instrument(token, segment)
         label = (item.get("label") or (instrument or {}).get("name") or token)
         candles_by_symbol[label] = candles
         coverage.append({
             "label": label, "token": token, "bars": len(candles),
-            "coverage": ticks.coverage(token, segment),
+            "coverage": {**ticks.coverage(token, segment), "stored_bars": len(candles)},
         })
 
     result = engine.run(
