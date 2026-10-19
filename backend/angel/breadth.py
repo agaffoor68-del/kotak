@@ -59,7 +59,9 @@ class MarketBreadthWorker:
             "source": "angel_one",
             "universe_size": len(universe),
             "priced": sum(1 for quote in quotes if quote.last is not None),
-            "breadth": market_hours.breadth(quotes),
+            # Always publish a complete numeric breadth object so clients never
+            # have to infer whether zero means "no data" or "no movers".
+            "breadth": {"advances": 0, "declines": 0, "unchanged": 0, "priced": 0, **(market_hours.breadth(quotes) or {})},
             "top_gainers": market_hours.rank(quotes, limit=10, reverse=True),
             "top_losers": market_hours.rank(quotes, limit=10, reverse=False),
             "most_active": market_hours.most_active(quotes, limit=10),
