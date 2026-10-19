@@ -25,6 +25,7 @@ table, so a restart does not lose history and a repeated request costs nothing.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 import time
@@ -448,6 +449,88 @@ def incremental(
         return local
     store(token, exchange_segment, interval, candles)
     return ticks.history(token, exchange_segment, interval, limit)
+
+
+async def download_historical_data(
+    call: Callable[..., dict[str, Any]],
+    symbol_token: str,
+    exchange: str,
+    interval: str,
+    start_date: datetime,
+    end_date: datetime,
+) -> list[dict[str, Any]]:
+    """Download a range in bounded chunks, with DB coverage and rate-limit retries.
+
+    The function is async so callers never busy-wait between SmartAPI requests.
+    Existing complete chunks are read from SQLite and do not consume API quota.
+    """
+    segment = exchange.lower() if exchange.lower() in SEGMENT_EXCHANGE else {
+        "NSE": "nse_cm", "NFO": "nse_fo", "BSE": "bse_cm", "BFO": "bse_fo",
+    }.get(exchange.upper(), exchange.lower())
+    platform_interval = next((key for key, value in INTERVAL_MAP.items() if value == interval), interval)
+    if platform_interval not in INTERVAL_MAP:
+        raise CandleError(f"Unsupported interval '{interval}'")
+    if start_date.tzinfo is None:
+        start_date = start_date.replace(tzinfo=IST)
+    if end_date.tzinfo is None:
+        end_date = end_date.replace(tzinfo=IST)
+    if start_date >= end_date:
+        raise CandleError("start_date must be before end_date")
+
+    token = str(symbol_token)
+    symbol, is_index = _symbol_for(token, segment)
+    chunk_days = CHUNK_DAYS.get(platform_interval, 30)
+    merged: dict[float, dict[str, Any]] = {}
+    cursor = start_date
+    request_number = 0
+
+    while cursor < end_date:
+        stop = min(cursor + timedelta(days=chunk_days), end_date)
+        stored = _stored_window(token, segment, platform_interval, cursor, stop)
+        if stored is not None:
+            merged.update({row["time"]: row for row in stored})
+            cursor = stop
+            continue
+
+        if request_number:
+            await asyncio.sleep(0.4)
+        rows: list[dict[str, Any]] | None = None
+        for attempt, backoff in enumerate((0, 5, 10, 20)):
+            if backoff:
+                await asyncio.sleep(backoff)
+            angel_limiter.wait()
+            try:
+                rows = _call_historical(
+                    call, token=token, segment=segment, symbol=symbol or token,
+                    interval=INTERVAL_MAP[platform_interval], start=cursor, end=stop,
+                    is_index=is_index,
+                )
+                break
+            except Exception as error:  # noqa: BLE001 - broker SDK errors vary
+                text = str(error).lower()
+                limited = "403" in text or "429" in text or "rate" in text or "ab1010" in text or "ab1021" in text
+                if not limited or attempt == 3:
+                    raise CandleError(f"SmartAPI historical call failed: {error}") from error
+                log.warning("Historical request rate-limited; retrying in %ss", backoff or 5)
+        if rows is None:
+            raise CandleError("SmartAPI returned no candle data")
+        if rows:
+            store(token, segment, platform_interval, rows)
+            merged.update({row["time"]: row for row in rows})
+        request_number += 1
+        cursor = stop
+
+    result = [merged[key] for key in sorted(merged)]
+    log.info("Historical download complete: %s/%s %s rows=%s", token, segment, platform_interval, len(result))
+    return result
+
+
+def download_historical_data_sync(
+    call: Callable[..., dict[str, Any]], symbol_token: str, exchange: str, interval: str,
+    start_date: datetime, end_date: datetime,
+) -> list[dict[str, Any]]:
+    """Synchronous adapter for FastAPI BackgroundTasks and CLI callers."""
+    return asyncio.run(download_historical_data(call, symbol_token, exchange, interval, start_date, end_date))
 
 
 def fetch_and_save_historical_candles(

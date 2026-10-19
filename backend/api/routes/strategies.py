@@ -315,17 +315,9 @@ def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)
     for item in definition.get("universe") or []:
         token = str(item["token"])
         segment = item.get("exchange_segment", "nse_cm")
+        # Backtests are deterministic and offline: history must be prefetched
+        # through /market/prefetch-data, never fetched from SmartAPI here.
         candles = ticks.history(token, segment, interval, 5000)
-        if not candles:
-            try:
-                candles = angel_candles.fetch_and_save_historical_candles(
-                    angel_call(user), token, segment,
-                    angel_candles.INTERVAL_MAP[interval],
-                    payload.history_days,
-                )
-            except Exception as error:  # noqa: BLE001 - surfaced in coverage/result
-                log.warning("Automatic history download failed for %s/%s: %s", token, segment, error)
-                candles = []
         instrument = master.get_instrument(token, segment)
         label = (item.get("label") or (instrument or {}).get("name") or token)
         candles_by_symbol[label] = candles
