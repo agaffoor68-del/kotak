@@ -21,7 +21,7 @@ from backend.api.deps import CurrentUser, angel_call, broker_call, current_user,
 from backend.core.database import app_cursor
 from backend.marketdata import master
 from backend.marketdata.quotes import quote_engine
-from backend.options.chain import build_chain
+from backend.options.chain import build_chain, calculate_strike, strike_interval
 
 log = logging.getLogger("alphatrade.api.options")
 
@@ -109,6 +109,8 @@ def option_chain(
     underlying: str = Query(description="Underlying symbol, e.g. NIFTY"),
     exchange_segment: str = Query(default="nse_fo"),
     expiry: str | None = Query(default=None, description="ISO expiry date YYYY-MM-DD. If omitted, nearest future expiry is dynamically selected"),
+    strike_type: str = Query(default="ATM", pattern="^(ITM|ATM|OTM)$", description="Strategy strike selection mode"),
+    offset: int = Query(default=15, ge=0, le=50, description="Number of strike intervals from ATM"),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
     """Full option chain with OI, IV, Greeks, PCR, max pain and support/resistance.
@@ -178,6 +180,20 @@ def option_chain(
 
     target_rows = by_expiry.get(selected_expiry or "") or (by_expiry[all_expiries[0]] if all_expiries else {})
 
+    # Quote only a bounded window around ATM. The full master remains available,
+    # while missing legs are safely ignored by build_chain.
+    underlying_record = _find_index_for(underlying)
+    spot_quote = quote_engine.cached(underlying_record["token"], underlying_record["exchange_segment"]) if underlying_record else None
+    spot = spot_quote.last if spot_quote and spot_quote.last else None
+    interval = strike_interval(underlying)
+    available_strikes = sorted(float(value) for value in target_rows)
+    selected_strikes: set[float] | None = None
+    if spot:
+        atm = calculate_strike(spot, "ATM", "CE", interval=interval)
+        nearest = min(available_strikes, key=lambda value: abs(value - atm), default=atm)
+        selected_strikes = {nearest + step * interval for step in range(-offset, offset + 1)}
+        target_rows = {key: value for key, value in target_rows.items() if float(key) in selected_strikes}
+
     # 3. Collect exact symbol tokens for all strikes (Call and Put)
     token_keys_to_fetch: list[tuple[str, str]] = []
     token_to_quote_map: dict[str, Any] = {}
@@ -211,19 +227,13 @@ def option_chain(
             return None
         return token_to_quote_map.get(str(token))
 
-    # Spot from the underlying index, so the Greeks use a real underlying price.
-    underlying_record = _find_index_for(underlying)
-    spot_quote = None
-    if underlying_record:
-        spot_quote = quote_engine.cached(underlying_record["token"], underlying_record["exchange_segment"])
-    spot = spot_quote.last if spot_quote and spot_quote.last else None
-
     chain = build_chain(
         contracts_envelope,
         spot=spot,
         quote_lookup=quote_lookup,
         now_ts=time.time(),
         target_expiry=selected_expiry,
+        strike_filter=selected_strikes,
     )
     chain["underlying"] = underlying
     chain["fetch_error"] = fetch_error
