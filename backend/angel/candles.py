@@ -25,6 +25,7 @@ table, so a restart does not lose history and a repeated request costs nothing.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 import time
@@ -32,7 +33,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from backend.core.config import settings
-from backend.core.database import app_cursor
+from backend.core.database import app_cursor, market_cursor
 from backend.marketdata import ticks
 from backend.angel.instruments import SEGMENT_EXCHANGE
 from backend.angel.ratelimit import angel_limiter
@@ -66,6 +67,26 @@ _CACHE_TTL = 20.0
 #: `days=2` request can never satisfy a later `days=500` request from the cache.
 _cache: dict[tuple[str, str, str, int, int], tuple[float, list[dict[str, Any]]]] = {}
 _cache_lock = threading.Lock()
+
+
+def _stored_window(token: str, segment: str, interval: str, start: datetime, end: datetime) -> list[dict[str, Any]] | None:
+    """Return persisted candles only when the database fully covers the request."""
+    interval_seconds = ticks.INTERVAL_SECONDS[interval]
+    start_bucket = int(start.timestamp() // interval_seconds)
+    end_bucket = int(end.timestamp() // interval_seconds)
+    with market_cursor() as cursor:
+        cursor.execute(
+            """SELECT bucket, open, high, low, close, volume, trades
+               FROM candles WHERE token = ? AND exchange_segment = ? AND interval = ?
+               AND bucket BETWEEN ? AND ? ORDER BY bucket""",
+            (str(token), segment, interval, start_bucket, end_bucket),
+        )
+        rows = cursor.fetchall()
+    if not rows or int(rows[0]["bucket"]) > start_bucket or int(rows[-1]["bucket"]) < end_bucket:
+        return None
+    return [{"time": int(row["bucket"] * interval_seconds), "open": float(row["open"]),
+             "high": float(row["high"]), "low": float(row["low"]), "close": float(row["close"]),
+             "volume": float(row["volume"] or 0), "trades": int(row["trades"] or 0)} for row in rows]
 
 
 def _range_key(token: str, exchange_segment: str, interval: str, start: datetime, end: datetime) -> tuple[str, str, str, int, int]:
@@ -255,16 +276,31 @@ def fetch(
         stop = min(cursor + timedelta(days=chunk), end)
         # One token per historical call, shared with the quote feed so the whole
         # process stays inside SmartAPI's 3 req/sec budget.
-        angel_limiter.wait()
-        try:
-            rows = _call_historical(
-                call, token=str(token), segment=exchange_segment, symbol=symbol,
-                interval=angel_interval, start=cursor, end=stop, is_index=is_index,
-            )
-        except CandleError:
-            raise
-        except Exception as error:  # noqa: BLE001 - transport/SDK failure
-            raise CandleError(f"SmartAPI historical call failed for {symbol}: {error}") from error
+        rows: list[dict[str, Any]] | None = None
+        for attempt, backoff in enumerate((0, 5, 10, 20)):
+            angel_limiter.wait()
+            try:
+                rows = _call_historical(
+                    call, token=str(token), segment=exchange_segment, symbol=symbol,
+                    interval=angel_interval, start=cursor, end=stop, is_index=is_index,
+                )
+                break
+            except CandleError as error:
+                text = str(error).lower()
+                rate_limited = "403" in text or "rate" in text or "ab1021" in text or "ab1010" in text
+                if not rate_limited or attempt == 3:
+                    raise
+                log.warning("Historical request rate-limited; retrying in %ss (%s/%s)", backoff, attempt + 1, 3)
+                time.sleep(backoff)
+            except Exception as error:  # noqa: BLE001 - transport/SDK failure
+                text = str(error).lower()
+                rate_limited = "403" in text or "rate" in text or "ab1021" in text or "ab1010" in text
+                if not rate_limited or attempt == 3:
+                    raise CandleError(f"SmartAPI historical call failed for {symbol}: {error}") from error
+                log.warning("Historical request rate-limited; retrying in %ss (%s/%s)", backoff, attempt + 1, 3)
+                time.sleep(backoff)
+        if rows is None:
+            raise CandleError(f"SmartAPI historical call failed for {symbol}: no response")
         for candle in rows:
             merged[candle["time"]] = candle
         cursor = stop
@@ -330,6 +366,12 @@ def history(
         cached = _cache.get(key)
         if cached and now - cached[0] < _CACHE_TTL:
             return cached[1][-limit:], True
+
+    stored = _stored_window(token, exchange_segment, interval, window_start, window_end)
+    if stored is not None:
+        with _cache_lock:
+            _cache[key] = (now, stored)
+        return stored[-limit:], True
 
     candles = fetch(
         call, token, exchange_segment, interval,
@@ -409,6 +451,88 @@ def incremental(
     return ticks.history(token, exchange_segment, interval, limit)
 
 
+async def download_historical_data(
+    call: Callable[..., dict[str, Any]],
+    symbol_token: str,
+    exchange: str,
+    interval: str,
+    start_date: datetime,
+    end_date: datetime,
+) -> list[dict[str, Any]]:
+    """Download a range in bounded chunks, with DB coverage and rate-limit retries.
+
+    The function is async so callers never busy-wait between SmartAPI requests.
+    Existing complete chunks are read from SQLite and do not consume API quota.
+    """
+    segment = exchange.lower() if exchange.lower() in SEGMENT_EXCHANGE else {
+        "NSE": "nse_cm", "NFO": "nse_fo", "BSE": "bse_cm", "BFO": "bse_fo",
+    }.get(exchange.upper(), exchange.lower())
+    platform_interval = next((key for key, value in INTERVAL_MAP.items() if value == interval), interval)
+    if platform_interval not in INTERVAL_MAP:
+        raise CandleError(f"Unsupported interval '{interval}'")
+    if start_date.tzinfo is None:
+        start_date = start_date.replace(tzinfo=IST)
+    if end_date.tzinfo is None:
+        end_date = end_date.replace(tzinfo=IST)
+    if start_date >= end_date:
+        raise CandleError("start_date must be before end_date")
+
+    token = str(symbol_token)
+    symbol, is_index = _symbol_for(token, segment)
+    chunk_days = CHUNK_DAYS.get(platform_interval, 30)
+    merged: dict[float, dict[str, Any]] = {}
+    cursor = start_date
+    request_number = 0
+
+    while cursor < end_date:
+        stop = min(cursor + timedelta(days=chunk_days), end_date)
+        stored = _stored_window(token, segment, platform_interval, cursor, stop)
+        if stored is not None:
+            merged.update({row["time"]: row for row in stored})
+            cursor = stop
+            continue
+
+        if request_number:
+            await asyncio.sleep(0.4)
+        rows: list[dict[str, Any]] | None = None
+        for attempt, backoff in enumerate((0, 5, 10, 20)):
+            if backoff:
+                await asyncio.sleep(backoff)
+            angel_limiter.wait()
+            try:
+                rows = _call_historical(
+                    call, token=token, segment=segment, symbol=symbol or token,
+                    interval=INTERVAL_MAP[platform_interval], start=cursor, end=stop,
+                    is_index=is_index,
+                )
+                break
+            except Exception as error:  # noqa: BLE001 - broker SDK errors vary
+                text = str(error).lower()
+                limited = "403" in text or "429" in text or "rate" in text or "ab1010" in text or "ab1021" in text
+                if not limited or attempt == 3:
+                    raise CandleError(f"SmartAPI historical call failed: {error}") from error
+                log.warning("Historical request rate-limited; retrying in %ss", backoff or 5)
+        if rows is None:
+            raise CandleError("SmartAPI returned no candle data")
+        if rows:
+            store(token, segment, platform_interval, rows)
+            merged.update({row["time"]: row for row in rows})
+        request_number += 1
+        cursor = stop
+
+    result = [merged[key] for key in sorted(merged)]
+    log.info("Historical download complete: %s/%s %s rows=%s", token, segment, platform_interval, len(result))
+    return result
+
+
+def download_historical_data_sync(
+    call: Callable[..., dict[str, Any]], symbol_token: str, exchange: str, interval: str,
+    start_date: datetime, end_date: datetime,
+) -> list[dict[str, Any]]:
+    """Synchronous adapter for FastAPI BackgroundTasks and CLI callers."""
+    return asyncio.run(download_historical_data(call, symbol_token, exchange, interval, start_date, end_date))
+
+
 def fetch_and_save_historical_candles(
     call: Callable[..., dict[str, Any]],
     symbol_token: str,
@@ -456,11 +580,9 @@ def live_candle(
     exchange_segment: str,
     interval: str,
 ) -> dict[str, Any] | None:
-    """The current, still-forming candle — the last row of a small fetch."""
-    try:
-        candles = fetch(call, token, exchange_segment, interval, days=2)
-    except CandleError:
-        return None
+    """Return the current candle built from WebSocket ticks; never poll history."""
+    del call
+    candles = ticks.history(token, exchange_segment, interval, limit=1)
     return candles[-1] if candles else None
 
 

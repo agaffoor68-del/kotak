@@ -11,10 +11,12 @@ session pool out of the route bodies.
 
 from __future__ import annotations
 
+import asyncio
 import time
+from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from backend.angel import breadth as angel_breadth
@@ -117,6 +119,40 @@ class HistoryDownloadRequest(BaseModel):
     exchange: str = Field(default="NSE")
     interval: str = Field(default="FIVE_MINUTE")
     days: int = Field(default=5, ge=1, le=1800)
+
+
+class PrefetchDataRequest(BaseModel):
+    symbol_token: str = Field(min_length=1, max_length=32)
+    exchange: str = Field(default="NSE")
+    interval: str = Field(default="5m")
+    start_date: datetime
+    end_date: datetime
+
+
+@router.post("/prefetch-data", status_code=status.HTTP_202_ACCEPTED)
+def prefetch_data(
+    payload: PrefetchDataRequest,
+    background_tasks: BackgroundTasks,
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Queue a bounded historical download; backtests never call SmartAPI."""
+    if payload.interval not in angel_candles.INTERVAL_MAP and payload.interval not in angel_candles.INTERVAL_MAP.values():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unsupported interval")
+    if payload.start_date >= payload.end_date:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "start_date must be before end_date")
+
+    call = angel_call(user)
+    background_tasks.add_task(
+        angel_candles.download_historical_data_sync,
+        call, payload.symbol_token, payload.exchange, payload.interval,
+        payload.start_date, payload.end_date,
+    )
+    return {
+        "status": "accepted", "symbol_token": payload.symbol_token,
+        "exchange": payload.exchange, "interval": payload.interval,
+        "start_date": payload.start_date.isoformat(), "end_date": payload.end_date.isoformat(),
+        "message": "Historical download queued. Backtest after it completes.",
+    }
 
 
 @router.post("/download-history")
