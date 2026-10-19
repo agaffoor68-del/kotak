@@ -53,7 +53,8 @@ class MarketBreadthWorker:
         universe = instruments.equity_universe("nse_cm", settings.breadth_universe_size)
         if not universe:
             return None
-        quotes = fetch(call, [(row["token"], row["exchange_segment"]) for row in universe], "ltp")
+        # LTP mode does not include previous close; OHLC is required for A/D.
+        quotes = fetch(call, [(row["token"], row["exchange_segment"]) for row in universe], "ohlc")
         snapshot = {
             "as_of": time.time(),
             "source": "angel_one",
