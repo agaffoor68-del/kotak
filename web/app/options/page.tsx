@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { OptionChain } from "@/lib/api";
+import { marketStore, useMarketStore } from "@/lib/market-store";
 import { AppShell } from "@/components/app-shell";
 import { Empty, ErrorNote, Loading, Metric, Panel, Pill } from "@/components/ui";
 import { compactInt, num, percent, toneClass } from "@/lib/format";
@@ -13,7 +14,8 @@ const UNDERLYINGS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"];
 
 function OptionDesk() {
   const [underlying, setUnderlying] = useState("NIFTY");
-  const [chain, setChain] = useState<OptionChain | null>(null);
+  const storedChains = useMarketStore().chains;
+  const [chain, setChain] = useState<OptionChain | null>(() => storedChains.NIFTY ?? null);
   const [underlyings, setUnderlyings] = useState<string[]>(UNDERLYINGS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,9 @@ function OptionDesk() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setChain(await api.chain(underlying));
+      const nextChain = await api.chain(underlying);
+      marketStore.setChain(underlying, nextChain);
+      setChain(nextChain);
       setError(null);
     } catch (failure) {
       setChain(null);
@@ -41,6 +45,7 @@ function OptionDesk() {
   }, [underlying]);
 
   useEffect(() => {
+    setChain(storedChains[underlying] ?? null);
     void load();
     const timer = setInterval(() => void load(), 30_000);
     return () => clearInterval(timer);

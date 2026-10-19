@@ -55,7 +55,7 @@ function MarketWatch() {
       { token: "26009", exchange_segment: "nse_cm", symbol: "BANKNIFTY", trading_symbol: "BANKNIFTY", name: "NIFTY BANK", is_index: 1 },
       { token: "26037", exchange_segment: "nse_cm", symbol: "FINNIFTY", trading_symbol: "FINNIFTY", name: "FIN NIFTY", is_index: 1 },
       { token: "26074", exchange_segment: "nse_cm", symbol: "MIDCPNIFTY", trading_symbol: "MIDCPNIFTY", name: "MIDCAP NIFTY", is_index: 1 },
-      { token: "265", exchange_segment: "bse_cm", symbol: "SENSEX", trading_symbol: "SENSEX", name: "S&P BSE SENSEX", is_index: 1 },
+      { token: "99919000", exchange_segment: "bse_cm", symbol: "SENSEX", trading_symbol: "SENSEX", name: "S&P BSE SENSEX", is_index: 1 },
     ];
     setWatch(seeds.map((instrument) => ({ instrument })));
     setSelected({ instrument: seeds[0] });

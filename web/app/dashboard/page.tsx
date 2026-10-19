@@ -34,7 +34,7 @@ const INDEX_TOKENS = [
   { token: "26009", segment: "nse_cm", label: "NIFTY BANK" },
   { token: "26037", segment: "nse_cm", label: "FIN NIFTY" },
   { token: "26074", segment: "nse_cm", label: "MIDCAP NIFTY" },
-  { token: "265", segment: "bse_cm", label: "SENSEX" },
+  { token: "99919000", segment: "bse_cm", label: "SENSEX" },
 ];
 
 function Overview() {

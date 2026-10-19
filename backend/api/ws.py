@@ -17,12 +17,29 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from backend.angel.feed import angel_feed
 from backend.core.security import decode_access_token
 from backend.marketdata import market_hours, master
+from backend.angel.breadth import market_breadth_worker
+from backend.api.models.market import BreadthData, IndexData, MarketOverview, quote_to_mover
+from backend.marketdata.quotes import quote_engine
+
+INDEX_KEYS = [("26000", "nse_cm", "NIFTY"), ("26009", "nse_cm", "BANKNIFTY"), ("26037", "nse_cm", "FINNIFTY"), ("26074", "nse_cm", "MIDCPNIFTY"), ("99919000", "bse_cm", "SENSEX")]
+
+
+def _market_overview() -> dict[str, Any]:
+    indices = []
+    for token, segment, symbol in INDEX_KEYS:
+        quote = quote_engine.cached(token, segment)
+        data = quote.to_dict() if quote else {}
+        indices.append(IndexData(symbol=symbol, token=token, exchange_segment=segment, last=data.get("last"), change=data.get("change"), change_percent=data.get("change_percent"), updated_at=data.get("updated_at")))
+    snapshot = market_breadth_worker.snapshot() or {}
+    raw = snapshot.get("breadth") or {}
+    overview = MarketOverview(as_of=float(snapshot.get("as_of") or time.time()), indices=indices, breadth=BreadthData(**{key: value for key, value in raw.items() if key in BreadthData.model_fields}), top_gainers=[quote_to_mover(item) for item in snapshot.get("top_gainers", [])], top_losers=[quote_to_mover(item) for item in snapshot.get("top_losers", [])])
+    return overview.model_dump(mode="json")
 
 log = logging.getLogger("alphatrade.ws")
 
 router = APIRouter(tags=["websocket"])
 
-HEARTBEAT_SECONDS = 20
+HEARTBEAT_SECONDS = 5
 
 
 def _authenticate(token: str | None) -> dict[str, Any] | None:
@@ -60,6 +77,10 @@ async def market_stream(websocket: WebSocket, token: str | None = Query(default=
                 payload = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_SECONDS)
             except asyncio.TimeoutError:
                 # A periodic frame lets the client detect a dead connection.
+                await websocket.send_json({
+                    "type": "market_overview",
+                    "data": _market_overview(),
+                })
                 await websocket.send_json({
                     "type": "heartbeat",
                     "session": market_hours.session_state(),
