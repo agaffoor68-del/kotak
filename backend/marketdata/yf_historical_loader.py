@@ -18,7 +18,7 @@ log = logging.getLogger("alphatrade.yfinance")
 
 # Well-known indices cannot be inferred by appending .NS/.BO.
 YF_TICKERS: dict[str, str] = {
-    "26000": "^NSEI", "NIFTY": "^NSEI", "NIFTY 50": "^NSEI", "^NSEI": "^NSEI",
+    "26000": "^NSEI", "99926000": "^NSEI", "NIFTY": "^NSEI", "NIFTY 50": "^NSEI", "^NSEI": "^NSEI",
     "26009": "^NSEBANK", "BANKNIFTY": "^NSEBANK", "NIFTY BANK": "^NSEBANK",
     "265": "^BSESN", "SENSEX": "^BSESN", "^BSESN": "^BSESN",
 }

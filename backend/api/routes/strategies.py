@@ -335,6 +335,11 @@ def download_historical_data(
             payload.start_date,
             payload.end_date,
             exchange_segment=exchange_segment,
+            angel_call=angel_call,
+        )
+        log.info(
+            "Downloaded %d rows for %s from %s to %s",
+            len(candles), payload.symbol_token, payload.start_date, payload.end_date,
         )
     except HistoricalDataError as error:
         log.warning("Historical download failed for %s: %s", payload.symbol_token, error)
