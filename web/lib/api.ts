@@ -587,6 +587,13 @@ export const api = {
     post<PineImportResult>("/api/v1/strategies/pine/import", body),
   exportPine: (definition: unknown) =>
     post<PineExportResult>("/api/v1/strategies/pine/export", { definition }),
+  downloadHistoricalData: (body: {
+    symbol_token: string;
+    symbol: string;
+    start_date: string;
+    end_date: string;
+    timeframe: string;
+  }) => post<{ status: string; message: string; bars: number; symbol: string; symbol_token: string }>("/api/v1/backtest/download-data", body),
   backtest: (body: {
     strategy_id?: string;
     definition?: unknown;

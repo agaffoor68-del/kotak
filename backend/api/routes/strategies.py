@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -23,6 +23,7 @@ from backend.strategies.indicators import available
 from backend.strategies.templates import TEMPLATES
 
 router = APIRouter(prefix="/api/v1/strategies", tags=["strategies"])
+backtest_router = APIRouter(prefix="/api/v1/backtest", tags=["backtest"])
 log = logging.getLogger("alphatrade.api.strategies")
 
 
@@ -31,6 +32,21 @@ class StrategyRequest(BaseModel):
     description: str = ""
     definition: dict[str, Any]
     is_template: bool = False
+
+
+class HistoricalDownloadRequest(BaseModel):
+    symbol_token: str = Field(min_length=1, max_length=64)
+    symbol: str = Field(min_length=1, max_length=120)
+    start_date: date
+    end_date: date
+    timeframe: str = Field(default="5m", pattern="^(1m|3m|5m|15m|30m|60m|1d)$")
+
+    @field_validator("symbol_token", "symbol", mode="before")
+    @classmethod
+    def non_blank(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("must be a non-empty string")
+        return value.strip()
 
 
 class BacktestRequest(BaseModel):
@@ -295,6 +311,56 @@ def promote_strategy(
 
 
 # ---------------------------------------------------------------- backtesting
+
+
+@backtest_router.post("/download-data")
+def download_historical_data(
+    payload: HistoricalDownloadRequest,
+    user: CurrentUser = Depends(require_trader),
+) -> dict[str, Any]:
+    """Download a bounded Yahoo Finance range and persist it as durable candles."""
+    if payload.start_date > payload.end_date:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "start_date must be before end_date")
+    if (payload.end_date - payload.start_date).days > 3650:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Date range cannot exceed 10 years")
+
+    instrument = master.get_instrument(payload.symbol_token, "nse_cm") or master.get_instrument(payload.symbol_token, "nse_fo")
+    exchange_segment = (instrument or {}).get("exchange_segment", "nse_cm")
+    from backend.marketdata.yf_historical_loader import HistoricalDataError, download_yf_data
+
+    try:
+        candles = download_yf_data(
+            payload.symbol_token,
+            payload.timeframe,
+            payload.start_date,
+            payload.end_date,
+            exchange_segment=exchange_segment,
+        )
+    except HistoricalDataError as error:
+        log.warning("Historical download failed for %s: %s", payload.symbol_token, error)
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"No historical data found for {payload.symbol}. Please check the symbol and date range.",
+        ) from error
+
+    saved = ticks.stored_history(
+        payload.symbol_token, exchange_segment, payload.timeframe,
+        limit=50000,
+        start_ts=datetime.combine(payload.start_date, datetime.min.time(), tzinfo=timezone.utc).timestamp(),
+        end_ts=datetime.combine(payload.end_date, datetime.max.time(), tzinfo=timezone.utc).timestamp(),
+    )
+    if not saved:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No historical data found for {payload.symbol}. Please check the symbol and date range.")
+    return {
+        "status": "ok",
+        "message": "Data downloaded successfully",
+        "symbol": payload.symbol,
+        "symbol_token": payload.symbol_token,
+        "timeframe": payload.timeframe,
+        "bars": len(saved),
+        "start_date": payload.start_date.isoformat(),
+        "end_date": payload.end_date.isoformat(),
+    }
 
 
 @router.post("/backtest")

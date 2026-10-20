@@ -186,12 +186,11 @@ def run(
         )
 
     warnings: list[str] = []
-    if not candles_by_symbol:
+    if not candles_by_symbol or not any(candles_by_symbol.values()):
         return BacktestResult(
             status="no_data",
-            note=(
-                "No historical candles are available for this strategy's universe."
-            ),
+            error="Data not found",
+            note="No historical candles were found for the requested range.",
         )
 
     required = _warmup_bars(definition)

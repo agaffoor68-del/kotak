@@ -52,6 +52,8 @@ function BacktestLab() {
   const [timeframe, setTimeframe] = useState("5m");
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
+  const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,6 +77,32 @@ function BacktestLab() {
     }, 250);
     return () => window.clearTimeout(timer);
   }, [instrumentQuery]);
+
+  async function downloadData() {
+    const token = symbolToken.trim();
+    const symbol = instrumentQuery.replace(/\s*\([^)]*\)$/, "").trim();
+    if (!token || !symbol || !startDate || !endDate) {
+      setError("Select an instrument and a start and end date before downloading historical data.");
+      return;
+    }
+    setDownloadBusy(true);
+    setDownloadMessage(null);
+    setError(null);
+    try {
+      const response = await api.downloadHistoricalData({
+        symbol_token: token,
+        symbol,
+        start_date: startDate,
+        end_date: endDate,
+        timeframe,
+      });
+      setDownloadMessage(`Data Downloaded Successfully! ${response.bars.toLocaleString()} bars saved.`);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Historical data download failed");
+    } finally {
+      setDownloadBusy(false);
+    }
+  }
 
   async function run() {
     const token = symbolToken.trim();
@@ -175,8 +203,12 @@ function BacktestLab() {
               {SLIPPAGE.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </Field>
-          <div className="flex items-end">
-            <button className="btn btn-primary w-full" onClick={() => void run()} disabled={busy || !selected} type="button">
+          <div className="flex flex-col justify-end gap-2">
+            {downloadMessage ? <p role="status" className="text-3xs text-up">{downloadMessage}</p> : null}
+            <button className="btn btn-secondary w-full" onClick={() => void downloadData()} disabled={downloadBusy || busy} type="button">
+              {downloadBusy ? "Downloading…" : "Download historical data"}
+            </button>
+            <button className="btn btn-primary w-full" onClick={() => void run()} disabled={busy || downloadBusy || !selected} type="button">
               {busy ? "Running…" : "Run backtest"}
             </button>
           </div>
@@ -185,7 +217,7 @@ function BacktestLab() {
 
       {busy && !result ? <Loading label="Simulating trades" /> : null}
 
-      {result && result.status === "no_data" ? (
+      {result && result.status === "no_data" && !result.error ? (
         <Empty
           title="Not enough recorded history"
           message={result.note}
@@ -197,6 +229,7 @@ function BacktestLab() {
           }
         />
       ) : null}
+      {result?.status === "no_data" && result.error ? <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-400">{result.error}</p> : null}
 
       {result && result.status === "invalid" ? (
         <Empty title="The strategy is invalid" message={result.error ?? "Fix the definition in the builder."} />
