@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -38,6 +39,9 @@ class BacktestRequest(BaseModel):
     initial_capital: float = Field(default=500_000.0, gt=0)
     slippage: str = Field(default="moderate")
     timeframe: str | None = None
+    symbol_token: str | None = Field(default=None, min_length=1, max_length=64)
+    start_date: str | None = None
+    end_date: str | None = None
     history_days: int = Field(default=5, ge=1, le=1800)
 
 
@@ -308,25 +312,45 @@ def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)
             f"Unsupported timeframe '{interval}'.",
         )
 
-    # Candles come only from recorded ticks — nothing is synthesised.
+    def parse_date(value: str | None, end: bool = False) -> float | None:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            if end and len(value) == 10:
+                parsed = parsed.replace(hour=23, minute=59, second=59)
+            return parsed.timestamp()
+        except ValueError as error:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Invalid date: {value}") from error
+
+    start_ts = parse_date(payload.start_date)
+    end_ts = parse_date(payload.end_date, end=True)
+    if start_ts is not None and end_ts is not None and start_ts > end_ts:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "start_date must be before end_date")
+
+    # A selected token is authoritative and is read directly from the durable candle DB.
+    requested = payload.symbol_token or None
+    universe = definition.get("universe") or []
+    if requested:
+        instrument = master.get_instrument(requested, "nse_cm") or master.get_instrument(requested, "nse_fo")
+        universe = [{"token": requested, "exchange_segment": (instrument or {}).get("exchange_segment", "nse_cm"), "label": (instrument or {}).get("trading_symbol") or (instrument or {}).get("name") or requested}]
+
     candles_by_symbol: dict[str, list[dict[str, Any]]] = {}
     coverage: list[dict[str, Any]] = []
-    for item in definition.get("universe") or []:
+    for item in universe:
         token = str(item["token"])
         segment = item.get("exchange_segment", "nse_cm")
-        # Resolve Angel credentials lazily: a normal database/yfinance
-        # backtest must not require any broker account.
-        candles = engine.load_history(
-            token, segment, interval, limit=5000,
-            angel_call=lambda *args, **kwargs: angel_call(user)(*args, **kwargs),
-        )
+        candles = ticks.stored_history(token, segment, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
         instrument = master.get_instrument(token, segment)
         label = (item.get("label") or (instrument or {}).get("name") or token)
         candles_by_symbol[label] = candles
-        coverage.append({
-            "label": label, "token": token, "bars": len(candles),
-            "coverage": {**ticks.coverage(token, segment), "stored_bars": len(candles)},
-        })
+        coverage.append({"label": label, "token": token, "bars": len(candles), "coverage": {**ticks.coverage(token, segment), "stored_bars": len(candles)}})
+
+    if requested and not candles_by_symbol.get(next(iter(candles_by_symbol), "")):
+        label = (coverage[0]["label"] if coverage else requested)
+        return {"status": "no_data", "error": f"No historical data found for {label}. Please download data first.", "note": "", "metrics": {}, "trades": [], "equity_curve": [], "drawdown_curve": [], "bars": 0, "warnings": [], "coverage": coverage, "interval": interval}
 
     result = engine.run(
         definition, candles_by_symbol,
