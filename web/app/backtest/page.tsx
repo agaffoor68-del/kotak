@@ -77,14 +77,40 @@ function BacktestLab() {
   }, [instrumentQuery]);
 
   async function run() {
-    if (!selected) return;
+    const token = symbolToken.trim();
+    const strategyId = selected.trim();
+    if (!strategyId || !token) {
+      setError("Please select a valid instrument or strategy before running the backtest.");
+      return;
+    }
+
+    const payload = {
+      strategy_id: strategyId,
+      initial_capital: capital,
+      slippage,
+      symbol_token: token,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
+      timeframe,
+    };
+    console.log("[v0] Backtest payload:", payload);
+
     setBusy(true);
     setResult(null);
+    setError(null);
     try {
-      setResult(await api.backtest({ strategy_id: selected, initial_capital: capital, slippage, symbol_token: symbolToken, start_date: startDate, end_date: endDate, timeframe }));
-      setError(null);
+      setResult(await api.backtest(payload));
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Backtest failed");
+      const apiFailure = failure as { status?: number; detail?: unknown; message?: string };
+      const detail = apiFailure.detail as { detail?: unknown } | undefined;
+      const validationDetail = detail?.detail ?? apiFailure.detail;
+      const hasEmptyRequiredField = Array.isArray(validationDetail) && validationDetail.some((item) => {
+        const entry = item as { loc?: unknown[]; msg?: string };
+        return Array.isArray(entry.loc) && (entry.loc.includes("symbol_token") || entry.loc.includes("strategy_id")) && /empty|at least 1 character|required/i.test(entry.msg ?? "");
+      });
+      setError(apiFailure.status === 422 && hasEmptyRequiredField
+        ? "Please select a valid instrument or strategy before running the backtest."
+        : failure instanceof Error ? failure.message : "Backtest failed");
     } finally {
       setBusy(false);
     }
@@ -135,7 +161,7 @@ function BacktestLab() {
             <input className="field-input" type="number" min={1000} step={10000} value={capital} onChange={(e) => setCapital(Number(e.target.value) || 0)} />
           </Field>
           <Field label="Select instrument" hint="Search by symbol or token">
-            <input className="field-input" list="backtest-instruments" value={instrumentQuery} placeholder="e.g. RELIANCE or 2885" onChange={(e) => { setInstrumentQuery(e.target.value); setSymbolToken(""); }} />
+            <input className="field-input" list="backtest-instruments" value={instrumentQuery} placeholder="e.g. RELIANCE or 2885" onChange={(e) => { const value = e.target.value; const tokenMatch = value.match(/\(([^)]+)\)$/) ?? value.match(/^\d+$/); setInstrumentQuery(value); setSymbolToken(tokenMatch?.[1] ?? ""); }} />
             <datalist id="backtest-instruments">
               {instruments.map((instrument) => <option key={instrument.token} value={`${instrument.trading_symbol} (${instrument.token})`} />)}
             </datalist>
