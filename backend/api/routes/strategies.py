@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import date, datetime, timezone
-from typing import Any
+from datetime import date
+from typing import Any, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
@@ -17,6 +17,7 @@ from backend.core.config import settings
 from backend.core.database import app_cursor, now, row_to_dict
 from backend.execution import algo
 from backend.marketdata import master, ticks
+from backend.marketdata.timeutils import ist_stamp, parse_ist, window as ist_window
 from backend.strategies import dsl, lifecycle, pine
 from backend.strategies.dsl import COMPARATORS, CROSS_OPS, PRICE_FIELDS
 from backend.strategies.indicators import available
@@ -313,12 +314,30 @@ def promote_strategy(
 # ---------------------------------------------------------------- backtesting
 
 
+def _angel_bridge(user: CurrentUser) -> Callable[..., dict[str, Any]] | None:
+    """The SmartAPI request bridge, or ``None`` when Angel is not configured.
+
+    yfinance alone is enough for the normal path, so a deployment without
+    Angel credentials must still be able to download history.
+    """
+    try:
+        return angel_call(user)
+    except HTTPException as error:
+        log.info("Angel fallback unavailable: %s", error.detail)
+        return None
+
+
 @backtest_router.post("/download-data")
 def download_historical_data(
     payload: HistoricalDownloadRequest,
     user: CurrentUser = Depends(require_trader),
 ) -> dict[str, Any]:
-    """Download a bounded Yahoo Finance range and persist it as durable candles."""
+    """Download a bounded Yahoo Finance range and persist it as durable candles.
+
+    The token the frontend sends is the token the rows are written under, so
+    the backtest query finds them under exactly the same key. The window is
+    interpreted in IST, which is the clock the bars are stamped with.
+    """
     if payload.start_date > payload.end_date:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "start_date must be before end_date")
     if (payload.end_date - payload.start_date).days > 3650:
@@ -326,20 +345,19 @@ def download_historical_data(
 
     instrument = master.get_instrument(payload.symbol_token, "nse_cm") or master.get_instrument(payload.symbol_token, "nse_fo")
     exchange_segment = (instrument or {}).get("exchange_segment", "nse_cm")
-    from backend.marketdata.yf_historical_loader import HistoricalDataError, download_yf_data
+    from backend.marketdata.yf_historical_loader import HistoricalDataError, download_history
+
+    # The same IST bounds the backtest query will use.
+    start, end = ist_window(payload.start_date, payload.end_date)
 
     try:
-        candles = download_yf_data(
+        summary = download_history(
             payload.symbol_token,
+            exchange_segment,
             payload.timeframe,
-            payload.start_date,
-            payload.end_date,
-            exchange_segment=exchange_segment,
-            angel_call=angel_call,
-        )
-        log.info(
-            "Downloaded %d rows for %s from %s to %s",
-            len(candles), payload.symbol_token, payload.start_date, payload.end_date,
+            start,
+            end,
+            angel_call=_angel_bridge(user),
         )
     except HistoricalDataError as error:
         log.warning("Historical download failed for %s: %s", payload.symbol_token, error)
@@ -348,11 +366,16 @@ def download_historical_data(
             f"No historical data found for {payload.symbol}. Please check the symbol and date range.",
         ) from error
 
+    rows = summary["rows"]
+    log.info(
+        f"Downloaded {rows} rows for {payload.symbol_token} from {start} to {end}"
+    )
+
     saved = ticks.stored_history(
         payload.symbol_token, exchange_segment, payload.timeframe,
         limit=50000,
-        start_ts=datetime.combine(payload.start_date, datetime.min.time(), tzinfo=timezone.utc).timestamp(),
-        end_ts=datetime.combine(payload.end_date, datetime.max.time(), tzinfo=timezone.utc).timestamp(),
+        start_ts=start.timestamp(),
+        end_ts=end.timestamp(),
     )
     if not saved:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No historical data found for {payload.symbol}. Please check the symbol and date range.")
@@ -361,6 +384,8 @@ def download_historical_data(
         "message": "Data downloaded successfully",
         "symbol": payload.symbol,
         "symbol_token": payload.symbol_token,
+        "yf_ticker": summary["yf_ticker"],
+        "source": summary["source"],
         "timeframe": payload.timeframe,
         "bars": len(saved),
         "start_date": payload.start_date.isoformat(),
@@ -393,14 +418,18 @@ def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)
         )
 
     def parse_date(value: str | None, end: bool = False) -> float | None:
+        """Epoch seconds for a user-supplied date, in **IST**.
+
+        The bars are stamped from IST wall-clock readings, so the window must
+        be built on the same clock: reading a naive date as UTC shifts the
+        whole window by five and a half hours and drops the session.
+        """
         if not value:
             return None
         try:
-            parsed = datetime.fromisoformat(value)
-            if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=timezone.utc)
+            parsed = parse_ist(value)
             if end and len(value) == 10:
-                parsed = parsed.replace(hour=23, minute=59, second=59)
+                parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=999_999)
             return parsed.timestamp()
         except ValueError as error:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Invalid date: {value}") from error
@@ -430,7 +459,16 @@ def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)
 
     if requested and not candles_by_symbol.get(next(iter(candles_by_symbol), "")):
         label = (coverage[0]["label"] if coverage else requested)
-        return {"status": "no_data", "error": f"No historical data found for {label}. Please download data first.", "note": "", "metrics": {}, "trades": [], "equity_curve": [], "drawdown_curve": [], "bars": 0, "warnings": [], "coverage": coverage, "interval": interval}
+        stored = ticks.stored_range(requested, interval)
+        if stored["bars"]:
+            error = (
+                f"No historical data found for {label} between {payload.start_date or 'the start'} and "
+                f"{payload.end_date or 'the end'} (IST). Stored: {stored['bars']} bars from "
+                f"{ist_stamp(stored['first_bar'])} to {ist_stamp(stored['last_bar'])}."
+            )
+        else:
+            error = f"No historical data found for {label}. Please download data first."
+        return {"status": "no_data", "error": error, "note": "", "metrics": {}, "trades": [], "equity_curve": [], "drawdown_curve": [], "bars": 0, "warnings": [], "coverage": coverage, "interval": interval}
 
     result = engine.run(
         definition, candles_by_symbol,

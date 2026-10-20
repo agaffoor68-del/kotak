@@ -593,7 +593,15 @@ export const api = {
     start_date: string;
     end_date: string;
     timeframe: string;
-  }) => post<{ status: string; message: string; bars: number; symbol: string; symbol_token: string }>("/api/v1/backtest/download-data", body),
+  }) => post<{
+    status: string;
+    message: string;
+    bars: number;
+    symbol: string;
+    symbol_token: string;
+    yf_ticker?: string;
+    source?: string;
+  }>("/api/v1/backtest/download-data", body),
   backtest: (body: {
     strategy_id?: string;
     definition?: unknown;

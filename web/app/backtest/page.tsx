@@ -39,6 +39,11 @@ interface MetricsShape {
   slippage_model?: string;
 }
 
+/** A busy indicator that can live inside a button. */
+function Spinner() {
+  return <span className="h-3 w-3 animate-spin rounded-full border-2 border-edge border-t-accent" />;
+}
+
 function BacktestLab() {
   const [strategies, setStrategies] = useState<StrategyRowRecord[]>([]);
   const [selected, setSelected] = useState<string>("");
@@ -98,7 +103,10 @@ function BacktestLab() {
         end_date: endDate,
         timeframe,
       });
-      setDownloadMessage(`Data Downloaded Successfully! ${response.bars.toLocaleString()} bars saved.`);
+      setDownloadMessage(
+        `Data Downloaded Successfully! ${response.bars.toLocaleString()} bars saved for ${token}` +
+        `${response.yf_ticker ? ` (${response.yf_ticker})` : ""}.`,
+      );
       setDownloadReady(true);
     } catch {
       setError("Failed to download data. Check token or internet.");
@@ -209,9 +217,11 @@ function BacktestLab() {
           <div className="flex flex-col justify-end gap-2">
             {downloadMessage ? <p role="status" className="text-3xs text-up">{downloadMessage}</p> : null}
             <button className="btn btn-secondary w-full" onClick={() => void downloadData()} disabled={downloadBusy || busy} type="button">
+              {downloadBusy ? <Spinner /> : null}
               {downloadBusy ? "Downloading…" : "Download historical data"}
             </button>
-            <button className="btn btn-primary w-full" onClick={() => void run()} disabled={busy || downloadBusy || !selected || !downloadReady} type="button">
+            <button className="btn btn-primary w-full" onClick={() => void run()} disabled={busy || downloadBusy || !selected || !downloadReady} title={downloadReady ? undefined : "Download the historical data first"} type="button">
+              {busy ? <Spinner /> : null}
               {busy ? "Running…" : "Run backtest"}
             </button>
           </div>

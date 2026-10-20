@@ -307,6 +307,34 @@ def stored_history(
     ]
 
 
+def stored_range(token: str, interval: str) -> dict[str, Any]:
+    """What is stored for a token: bar count and the first/last bar.
+
+    Used to explain *why* a window came back empty instead of leaving the
+    caller with a bare "no historical data found".
+    """
+    if interval not in INTERVAL_SECONDS:
+        raise ValueError(f"Unsupported interval {interval!r}; expected one of {sorted(INTERVAL_SECONDS)}")
+    seconds = INTERVAL_SECONDS[interval]
+    with market_cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS bars, MIN(bucket) AS first_bucket, MAX(bucket) AS last_bucket
+            FROM candles WHERE token = ? AND interval = ?
+            """,
+            (str(token), interval),
+        )
+        row = cursor.fetchone()
+    bars = int(row["bars"] or 0)
+    first_bucket = row["first_bucket"]
+    last_bucket = row["last_bucket"]
+    return {
+        "bars": bars,
+        "first_bar": int(first_bucket) * seconds if first_bucket is not None else None,
+        "last_bar": int(last_bucket) * seconds if last_bucket is not None else None,
+    }
+
+
 def coverage(token: str, exchange_segment: str) -> dict[str, Any]:
     """How much real history exists for an instrument — surfaced in the UI."""
     with market_cursor() as cursor:
