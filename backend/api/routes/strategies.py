@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backend.api.deps import CurrentUser, angel_call, current_user, require_trader, resolve_account_id
 from backend.backtesting import engine
@@ -43,6 +43,15 @@ class BacktestRequest(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     history_days: int = Field(default=5, ge=1, le=1800)
+
+    @field_validator("strategy_id", "symbol_token", mode="before")
+    @classmethod
+    def reject_blank_identifiers(cls, value: str | None, info: Any) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{info.field_name} must be a non-empty string")
+        return value.strip()
 
 
 class StartRunRequest(BaseModel):
