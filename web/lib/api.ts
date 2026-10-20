@@ -593,6 +593,9 @@ export const api = {
     initial_capital?: number;
     slippage?: string;
     timeframe?: string;
+    symbol_token?: string;
+    start_date?: string;
+    end_date?: string;
   }) => post<BacktestResult>("/api/v1/strategies/backtest", body),
 
   // execution

@@ -44,6 +44,12 @@ function BacktestLab() {
   const [selected, setSelected] = useState<string>("");
   const [capital, setCapital] = useState(500000);
   const [slippage, setSlippage] = useState("moderate");
+  const [instrumentQuery, setInstrumentQuery] = useState("");
+  const [instruments, setInstruments] = useState<Array<{ token: string; symbol: string; trading_symbol: string; name?: string }>>([]);
+  const [symbolToken, setSymbolToken] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [timeframe, setTimeframe] = useState("5m");
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,12 +64,24 @@ function BacktestLab() {
       .catch((failure) => setError(failure instanceof Error ? failure.message : "Could not load strategies"));
   }, []);
 
+  useEffect(() => {
+    const query = instrumentQuery.trim();
+    if (!query) {
+      setInstruments([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      api.search(query, 20).then((response) => setInstruments(response.results)).catch(() => setInstruments([]));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [instrumentQuery]);
+
   async function run() {
     if (!selected) return;
     setBusy(true);
     setResult(null);
     try {
-      setResult(await api.backtest({ strategy_id: selected, initial_capital: capital, slippage }));
+      setResult(await api.backtest({ strategy_id: selected, initial_capital: capital, slippage, symbol_token: symbolToken, start_date: startDate, end_date: endDate, timeframe }));
       setError(null);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Backtest failed");
@@ -96,6 +114,7 @@ function BacktestLab() {
       </header>
 
       {error ? <ErrorNote error={error} /> : null}
+      {result?.error?.startsWith("No historical data found") ? <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-400">{result.error}</p> : null}
 
       <Panel title="Configuration">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -115,13 +134,19 @@ function BacktestLab() {
           <Field label="Starting capital (₹)">
             <input className="field-input" type="number" min={1000} step={10000} value={capital} onChange={(e) => setCapital(Number(e.target.value) || 0)} />
           </Field>
+          <Field label="Select instrument" hint="Search by symbol or token">
+            <input className="field-input" list="backtest-instruments" value={instrumentQuery} placeholder="e.g. RELIANCE or 2885" onChange={(e) => { setInstrumentQuery(e.target.value); setSymbolToken(""); }} />
+            <datalist id="backtest-instruments">
+              {instruments.map((instrument) => <option key={instrument.token} value={`${instrument.trading_symbol} (${instrument.token})`} />)}
+            </datalist>
+            {instruments.length ? <div className="mt-1 flex flex-col gap-1 text-3xs text-ink-faint">{instruments.slice(0, 5).map((instrument) => <button key={instrument.token} type="button" className="text-left hover:text-ink" onClick={() => { setInstrumentQuery(`${instrument.trading_symbol} (${instrument.token})`); setSymbolToken(instrument.token); }}>{instrument.trading_symbol} · token {instrument.token}</button>)}</div> : null}
+          </Field>
+          <Field label="Start date"><input className="field-input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></Field>
+          <Field label="End date"><input className="field-input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
+          <Field label="Timeframe"><select className="field-select" value={timeframe} onChange={(e) => setTimeframe(e.target.value)}><option value="1m">1m</option><option value="5m">5m</option><option value="15m">15m</option></select></Field>
           <Field label="Slippage model" hint="Applied against you on every fill">
             <select className="field-select" value={slippage} onChange={(e) => setSlippage(e.target.value)}>
-              {SLIPPAGE.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
+              {SLIPPAGE.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </Field>
           <div className="flex items-end">

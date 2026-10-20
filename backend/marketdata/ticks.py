@@ -263,7 +263,14 @@ def history(token: str, exchange_segment: str, interval: str, limit: int = 500) 
     return candles[-max(1, min(limit, 5000)):]
 
 
-def stored_history(token: str, exchange_segment: str, interval: str, limit: int = 5000) -> list[dict[str, Any]]:
+def stored_history(
+    token: str,
+    exchange_segment: str,
+    interval: str,
+    limit: int = 5000,
+    start_ts: float | None = None,
+    end_ts: float | None = None,
+) -> list[dict[str, Any]]:
     """Read persisted OHLCV bars, including yfinance/Angel backfills.
 
     This deliberately does not replace :func:`history`: the latter is the
@@ -273,19 +280,22 @@ def stored_history(token: str, exchange_segment: str, interval: str, limit: int 
     if interval not in INTERVAL_SECONDS:
         raise ValueError(f"Unsupported interval {interval!r}; expected one of {sorted(INTERVAL_SECONDS)}")
     capped_limit = max(1, min(int(limit), 50_000))
+    seconds = INTERVAL_SECONDS[interval]
     with market_cursor() as cursor:
         cursor.execute(
             """
             SELECT bucket, open, high, low, close, volume, trades
             FROM candles
             WHERE token = ? AND exchange_segment = ? AND interval = ?
+              AND (? IS NULL OR bucket * ? >= ?)
+              AND (? IS NULL OR bucket * ? <= ?)
             ORDER BY bucket DESC
             LIMIT ?
-            """,
-            (str(token), exchange_segment, interval, capped_limit),
+            """
+            , (str(token), exchange_segment, interval, start_ts, seconds, start_ts,
+               end_ts, seconds, end_ts, capped_limit),
         )
         rows = cursor.fetchall()
-    seconds = INTERVAL_SECONDS[interval]
     return [
         {
             "time": row["bucket"] * seconds,
