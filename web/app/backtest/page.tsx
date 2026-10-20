@@ -54,6 +54,7 @@ function BacktestLab() {
   const [busy, setBusy] = useState(false);
   const [downloadBusy, setDownloadBusy] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
+  const [downloadReady, setDownloadReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,6 +88,7 @@ function BacktestLab() {
     }
     setDownloadBusy(true);
     setDownloadMessage(null);
+    setDownloadReady(false);
     setError(null);
     try {
       const response = await api.downloadHistoricalData({
@@ -97,8 +99,9 @@ function BacktestLab() {
         timeframe,
       });
       setDownloadMessage(`Data Downloaded Successfully! ${response.bars.toLocaleString()} bars saved.`);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Historical data download failed");
+      setDownloadReady(true);
+    } catch {
+      setError("Failed to download data. Check token or internet.");
     } finally {
       setDownloadBusy(false);
     }
@@ -107,8 +110,8 @@ function BacktestLab() {
   async function run() {
     const token = symbolToken.trim();
     const strategyId = selected.trim();
-    if (!strategyId || !token) {
-      setError("Please select a valid instrument or strategy before running the backtest.");
+    if (!strategyId || !token || !downloadReady) {
+      setError("Please select an instrument, download its historical data, and then run the backtest.");
       return;
     }
 
@@ -127,7 +130,9 @@ function BacktestLab() {
     setResult(null);
     setError(null);
     try {
-      setResult(await api.backtest(payload));
+      const nextResult = await api.backtest(payload);
+      setResult(nextResult);
+      if (nextResult.status === "no_data" && nextResult.error) setError(nextResult.error);
     } catch (failure) {
       const apiFailure = failure as { status?: number; detail?: unknown; message?: string };
       const detail = apiFailure.detail as { detail?: unknown } | undefined;
@@ -168,8 +173,6 @@ function BacktestLab() {
       </header>
 
       {error ? <ErrorNote error={error} /> : null}
-      {result?.error?.startsWith("No historical data found") ? <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-400">{result.error}</p> : null}
-
       <Panel title="Configuration">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Strategy">
@@ -189,15 +192,15 @@ function BacktestLab() {
             <input className="field-input" type="number" min={1000} step={10000} value={capital} onChange={(e) => setCapital(Number(e.target.value) || 0)} />
           </Field>
           <Field label="Select instrument" hint="Search by symbol or token">
-            <input className="field-input" list="backtest-instruments" value={instrumentQuery} placeholder="e.g. RELIANCE or 2885" onChange={(e) => { const value = e.target.value; const tokenMatch = value.match(/\(([^)]+)\)$/) ?? value.match(/^\d+$/); setInstrumentQuery(value); setSymbolToken(tokenMatch?.[1] ?? ""); }} />
+            <input className="field-input" list="backtest-instruments" value={instrumentQuery} placeholder="e.g. RELIANCE or 2885" onChange={(e) => { const value = e.target.value; const tokenMatch = value.match(/\(([^)]+)\)$/) ?? value.match(/^\d+$/); setInstrumentQuery(value); setSymbolToken(tokenMatch?.[1] ?? ""); setDownloadReady(false); setDownloadMessage(null); }} />
             <datalist id="backtest-instruments">
               {instruments.map((instrument) => <option key={instrument.token} value={`${instrument.trading_symbol} (${instrument.token})`} />)}
             </datalist>
             {instruments.length ? <div className="mt-1 flex flex-col gap-1 text-3xs text-ink-faint">{instruments.slice(0, 5).map((instrument) => <button key={instrument.token} type="button" className="text-left hover:text-ink" onClick={() => { setInstrumentQuery(`${instrument.trading_symbol} (${instrument.token})`); setSymbolToken(instrument.token); }}>{instrument.trading_symbol} · token {instrument.token}</button>)}</div> : null}
           </Field>
-          <Field label="Start date"><input className="field-input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></Field>
-          <Field label="End date"><input className="field-input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
-          <Field label="Timeframe"><select className="field-select" value={timeframe} onChange={(e) => setTimeframe(e.target.value)}><option value="1m">1m</option><option value="5m">5m</option><option value="15m">15m</option></select></Field>
+          <Field label="Start date"><input className="field-input" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDownloadReady(false); setDownloadMessage(null); }} /></Field>
+          <Field label="End date"><input className="field-input" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDownloadReady(false); setDownloadMessage(null); }} /></Field>
+          <Field label="Timeframe"><select className="field-select" value={timeframe} onChange={(e) => { setTimeframe(e.target.value); setDownloadReady(false); setDownloadMessage(null); }}><option value="1m">1m</option><option value="5m">5m</option><option value="15m">15m</option></select></Field>
           <Field label="Slippage model" hint="Applied against you on every fill">
             <select className="field-select" value={slippage} onChange={(e) => setSlippage(e.target.value)}>
               {SLIPPAGE.map((value) => <option key={value} value={value}>{value}</option>)}
@@ -208,7 +211,7 @@ function BacktestLab() {
             <button className="btn btn-secondary w-full" onClick={() => void downloadData()} disabled={downloadBusy || busy} type="button">
               {downloadBusy ? "Downloading…" : "Download historical data"}
             </button>
-            <button className="btn btn-primary w-full" onClick={() => void run()} disabled={busy || downloadBusy || !selected} type="button">
+            <button className="btn btn-primary w-full" onClick={() => void run()} disabled={busy || downloadBusy || !selected || !downloadReady} type="button">
               {busy ? "Running…" : "Run backtest"}
             </button>
           </div>
@@ -229,8 +232,6 @@ function BacktestLab() {
           }
         />
       ) : null}
-      {result?.status === "no_data" && result.error ? <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-400">{result.error}</p> : null}
-
       {result && result.status === "invalid" ? (
         <Empty title="The strategy is invalid" message={result.error ?? "Fix the definition in the builder."} />
       ) : null}
