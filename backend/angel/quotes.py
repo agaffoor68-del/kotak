@@ -233,15 +233,31 @@ def fetch(
                 if isinstance(payload, dict) and payload.get("success") is False:
                     log.error("Angel SmartAPI rejected option quote request: %s", payload)
             except Exception as error:
-                log.error(
-                    "Angel SmartAPI option quote call failed: exchange=%s tokens=%s error=%s",
-                    exchange,
-                    token_list,
-                    error,
-                )
+                err_str = str(error)
+                lower_error = err_str.lower()
+                if "429" in lower_error or "too many requests" in lower_error or "rate limit" in lower_error:
+                    log.error(
+                        "Angel SmartAPI rate limit hit while fetching quotes: exchange=%s tokens=%s error=%s",
+                        exchange,
+                        token_list,
+                        error,
+                    )
+                elif any(marker in lower_error for marker in ("session", "jwt", "token", "unauthorized", "401")):
+                    log.error(
+                        "Angel SmartAPI session/auth failure while fetching quotes: exchange=%s tokens=%s error=%s",
+                        exchange,
+                        token_list,
+                        error,
+                    )
+                else:
+                    log.error(
+                        "Angel SmartAPI quote call failed: exchange=%s tokens=%s error=%s",
+                        exchange,
+                        token_list,
+                        error,
+                    )
                 traceback.print_exc()
                 # If HTTP 429 occurs, backoff and retry once
-                err_str = str(error)
                 if "429" in err_str or "Too Many Requests" in err_str:
                     log.warning("Angel SmartAPI 429 rate limit hit. Backing off 1.0s and retrying...")
                     time.sleep(1.0)
