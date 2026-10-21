@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from backend.core.config import settings
 from backend.marketdata import market_hours, master
+from backend.marketdata.quotes import quote_engine
 
 from . import instruments
 from .quotes import fetch
@@ -46,7 +47,10 @@ class MarketBreadthWorker:
 
     def refresh_once(self) -> dict[str, Any] | None:
         if not self._resolver:
-            return None
+            return self.snapshot()
+        if not market_hours.is_market_open() and self.snapshot():
+            log.info("Market is closed; returning the last known breadth snapshot")
+            return self.snapshot()
         _account_id, call = self._resolver()
         if call is None:
             return None
@@ -54,19 +58,34 @@ class MarketBreadthWorker:
         if not universe:
             return None
         # LTP mode does not include previous close; OHLC is required for A/D.
-        quotes = fetch(call, [(row["token"], row["exchange_segment"]) for row in universe], "ohlc")
+        try:
+            quotes = fetch(call, [(row["token"], row["exchange_segment"]) for row in universe], "ohlc")
+        except Exception:
+            log.exception("Market breadth broker quote request failed")
+            return self.snapshot()
+        if not quotes:
+            log.error("Market breadth broker quote request returned no rows")
+            return self.snapshot()
+        for quote in quotes:
+            quote_engine.store(quote)
+
         def with_symbols(items):
-            return [
-                {
-                    **item.to_dict(),
-                    "symbol": master.instrument_display(item.token, item.exchange_segment)[0],
-                    "name": master.instrument_display(item.token, item.exchange_segment)[1],
-                }
-                for item in items
-            ]
+            resolved = []
+            for item in items:
+                try:
+                    symbol, name = master.instrument_display(item.token, item.exchange_segment)
+                except (KeyError, AttributeError, TypeError, ValueError) as error:
+                    log.error(
+                        "Unable to map breadth token to symbol: token=%s segment=%s error=%s",
+                        item.token, item.exchange_segment, error,
+                    )
+                    symbol, name = str(item.token) or "UNKNOWN", None
+                resolved.append({**item.to_dict(), "symbol": symbol or str(item.token) or "UNKNOWN", "name": name})
+            return resolved
 
         snapshot = {
             "as_of": time.time(),
+            "market_session": market_hours.session_state(),
             "source": "angel_one",
             "universe_size": len(universe),
             "priced": sum(1 for quote in quotes if quote.last is not None),
