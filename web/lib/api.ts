@@ -198,6 +198,8 @@ export interface User {
 
 export interface Quote {
   token: string;
+  symbol?: string;
+  name?: string | null;
   exchange_segment: string;
   last: number | null;
   open: number | null;
