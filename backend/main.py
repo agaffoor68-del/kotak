@@ -158,20 +158,12 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS: the frontend is deployed on a different host (Vercel) and the API on
-# Render, and the origin changes with every preview deployment, so a fixed
-# allow-list turns into "Cannot reach the backend" for every new URL. Any
-# origin is accepted by default; ALLOWED_ORIGINS narrows it when the
-# deployment wants a locked-down list. With "*" Starlette echoes the
-# requesting origin, which keeps credentialed requests working.
-_allowed_origins = settings.allowed_origins or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if "*" in _allowed_origins else _allowed_origins,
+    allow_origins=["*"], # Allow all for now to fix the connection
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-QR-Payload"],  # required by api/routes/share.py QR download
 )
 
 
