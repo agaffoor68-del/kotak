@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -28,6 +29,22 @@ from backend.strategies.templates import TEMPLATES
 router = APIRouter(prefix="/api/v1/strategies", tags=["strategies"])
 backtest_router = APIRouter(prefix="/api/v1/backtest", tags=["backtest"])
 log = logging.getLogger("alphatrade.api.strategies")
+
+#: How long one history download is allowed to run. Server-side, never the
+#: caller's: a request that decides its own timeout can hold a worker thread
+#: for as long as it likes, and the reverse proxy in front of the API cuts the
+#: request off at 120s anyway.
+DOWNLOAD_TIMEOUT_SECONDS = 90
+
+#: The most history one request may ask for, in days. Ten years of daily bars
+#: is far more than any strategy needs, and the download is written to the
+#: persistent volume.
+MAX_HISTORY_DAYS = 3650
+
+#: The history downloads run here, not in a pool per request. One bounded
+#: pool means the number of downloads in flight is capped no matter how many
+#: requests arrive, and a download that outlives its request cannot multiply.
+_download_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="backtest-download")
 
 
 class StrategyRequest(BaseModel):
@@ -84,7 +101,6 @@ class AutoBacktestRequest(BacktestRequest):
     symbol: str | None = Field(default=None, min_length=1, max_length=120)
     exchange_segment: str | None = Field(default=None, max_length=32)
     auto_download: bool = True
-    download_timeout_seconds: int = Field(default=240, ge=30, le=1800)
 
 
 class StartRunRequest(BaseModel):
@@ -681,9 +697,9 @@ def _download_missing(
             angel_call=_angel_bridge(user),
         )
         try:
-            result = future.result(timeout=max(30, payload.download_timeout_seconds))
+            result = future.result(timeout=max(30, 90))  # TODO: review fix
         except TimeoutError:
-            summary["error"] = f"The historical download did not finish within {payload.download_timeout_seconds}s."
+            summary["error"] = f"The historical download did not finish within {90}s."  # TODO: review fix
             log.warning("Historical download timed out for %s", token)
         except HistoricalDataError as error:
             summary["error"] = str(error)

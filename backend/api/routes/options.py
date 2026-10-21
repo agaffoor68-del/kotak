@@ -374,12 +374,24 @@ async def _fetch_quotes(
         batch = keys[index:index + _QUOTE_BATCH]
         if index:
             await asyncio.sleep(_QUOTE_BATCH_DELAY)
-        try:
-            quotes = await asyncio.to_thread(angel_fetch, call, batch, "all")
-        except Exception as error:  # noqa: BLE001 - one bad batch must not blank the chain
-            log.exception("Option chain quote batch %s failed for %s", index // _QUOTE_BATCH + 1, underlying)
-            errors.append(f"batch {index // _QUOTE_BATCH + 1}: {error}")
-            continue
+        quotes = []
+        for attempt in (1, 2):
+            try:
+                quotes = await asyncio.to_thread(angel_fetch, call, batch, "all")
+            except Exception as error:  # noqa: BLE001 - one bad batch must not blank the chain
+                log.error("Option chain quote batch %s attempt %s failed for %s: %s", index // _QUOTE_BATCH + 1, attempt, underlying, error)
+                errors.append(f"batch {index // _QUOTE_BATCH + 1}: {error}")
+                quotes = []
+                if attempt == 1:
+                    await asyncio.sleep(_QUOTE_BATCH_DELAY)
+                    continue
+                break
+            if not quotes:
+                log.error("Option chain quote batch %s attempt %s returned empty data for %s", index // _QUOTE_BATCH + 1, attempt, underlying)
+                if attempt == 1:
+                    await asyncio.sleep(_QUOTE_BATCH_DELAY)
+                    continue
+            break
         for quote in quotes:
             # The cache is what the paper-trading engine prices against, so the
             # chain's quotes are stored: an order placed from this chain must
