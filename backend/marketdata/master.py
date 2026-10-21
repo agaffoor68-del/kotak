@@ -45,12 +45,14 @@ _state: dict[str, Any] = {"last_sync": None, "status": "idle", "error": None, "c
 
 #: Indices are not in the CSV; Neo resolves them through the quote API, so the
 #: well-known NSE index tokens are seeded from Kotak's own published values.
+# Angel One's canonical index namespace.  Do not seed the legacy Kotak
+# tokens here: SmartAPI quotes and the live feed use these official tokens.
 INDEX_SEED: list[dict[str, Any]] = [
-    {"token": "26000", "symbol": "NIFTY", "name": "NIFTY 50", "lot_size": 50, "tick": 0.05},
-    {"token": "26009", "symbol": "BANKNIFTY", "name": "NIFTY BANK", "lot_size": 15, "tick": 0.05},
-    {"token": "26037", "symbol": "FINNIFTY", "name": "FIN NIFTY", "lot_size": 65, "tick": 0.05},
-    {"token": "26074", "symbol": "MIDCPNIFTY", "name": "MIDCAP NIFTY", "lot_size": 140, "tick": 0.05},
-    {"token": "265", "symbol": "SENSEX", "name": "S&P BSE SENSEX", "lot_size": 1, "tick": 0.05, "segment": "bse_cm"},
+    {"token": "99926000", "symbol": "NIFTY 50", "name": "NIFTY 50", "lot_size": 50, "tick": 0.05},
+    {"token": "99919000", "symbol": "BANKNIFTY", "name": "NIFTY BANK", "lot_size": 15, "tick": 0.05},
+    {"token": "99926037", "symbol": "FINNIFTY", "name": "FIN NIFTY", "lot_size": 65, "tick": 0.05},
+    {"token": "99926074", "symbol": "MIDCPNIFTY", "name": "MIDCAP NIFTY", "lot_size": 140, "tick": 0.05},
+    {"token": "99919000", "symbol": "SENSEX", "name": "S&P BSE SENSEX", "lot_size": 1, "tick": 0.05, "segment": "bse_cm"},
 ]
 
 
