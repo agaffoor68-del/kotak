@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { IndicatorCatalog, PineImportResult, StrategyRowRecord } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
+import { QuickStrategyBuilder } from "@/components/quick-strategy-builder";
 import { Empty, ErrorNote, Field, Panel, StatusChip } from "@/components/ui";
 
 type Catalog = IndicatorCatalog;
@@ -234,6 +235,8 @@ function StrategyBuilder() {
       </header>
 
       {error ? <ErrorNote error={error} /> : null}
+
+      <QuickStrategyBuilder />
 
       <div className="grid gap-4 xl:grid-cols-4">
         {/* ---------------- editor ---------------- */}

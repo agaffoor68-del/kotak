@@ -231,9 +231,13 @@ class Settings:
         self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
         # --- CORS / public URL ------------------------------------------
+        # The frontend is deployed on a different host than the API and its
+        # origin changes with every preview deployment, so the default is to
+        # accept any origin. Set ALLOWED_ORIGINS to a comma-separated list to
+        # lock it down again; "*" means "any".
         self.allowed_origins = [
             origin.strip()
-            for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+            for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",")
             if origin.strip()
         ]
         self.public_url = os.getenv("PUBLIC_URL", "").rstrip("/")
@@ -243,15 +247,9 @@ class Settings:
         # LAN address rather than localhost, and that address moves with DHCP.
         # Pinning one origin works until the lease renews, and then every request
         # fails as "Failed to fetch" with nothing in the browser console to
-        # explain it. Development therefore accepts any http(s) origin, which is
-        # safe here because auth is a bearer token in sessionStorage (a foreign
-        # site cannot read it) and no cookie is ever issued. Production stays on
-        # the strict ALLOWED_ORIGINS list above.
-        self.allowed_origin_regex = (
-            None
-            if self.is_production
-            else os.getenv("ALLOWED_ORIGIN_REGEX", r"https?://.*").strip() or None
-        )
+        # explain it. The origin list above is therefore the single switch:
+        # it accepts any origin by default, and ALLOWED_ORIGINS narrows it.
+        self.allowed_origin_regex = None
 
         # --- feature gates -----------------------------------------------
         self.enable_live_trading = _flag("ENABLE_LIVE_TRADING", False)

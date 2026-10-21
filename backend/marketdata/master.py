@@ -352,6 +352,49 @@ def list_by_trading_symbol(trading_symbol: str, exchange_segment: str | None = N
         return [dict(row) for row in cursor.fetchall()]
 
 
+def find_instrument(query: str, exchange_segment: str | None = None) -> dict[str, Any] | None:
+    """Find one instrument by trading symbol, display symbol or company name.
+
+    The desk types what it knows — "NIFTY", "RELIANCE", "NIFTY 50" — while the
+    master stores the exchange's trading symbol, the display symbol and the
+    company name. An exact match on any of them wins; a partial match is the
+    fallback. Nothing is invented: when the master has no such instrument the
+    answer is ``None``.
+    """
+    text = str(query or "").strip()
+    if not text:
+        return None
+    segment_clause = " AND exchange_segment = ?" if exchange_segment else ""
+
+    with app_cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT * FROM instruments
+            WHERE (UPPER(trading_symbol) = UPPER(?) OR UPPER(symbol) = UPPER(?) OR UPPER(name) = UPPER(?))
+              {segment_clause}
+            ORDER BY is_index DESC, LENGTH(symbol) ASC
+            LIMIT 1
+            """,
+            (text, text, text, *([exchange_segment] if exchange_segment else [])),
+        )
+        row = cursor.fetchone()
+        if row is not None:
+            return dict(row)
+
+        cursor.execute(
+            f"""
+            SELECT * FROM instruments
+            WHERE (UPPER(trading_symbol) LIKE ? OR UPPER(symbol) LIKE ? OR UPPER(name) LIKE ?)
+              {segment_clause}
+            ORDER BY is_index DESC, LENGTH(symbol) ASC
+            LIMIT 1
+            """,
+            (f"%{text.upper()}%", f"%{text.upper()}%", f"%{text.upper()}%", *([exchange_segment] if exchange_segment else [])),
+        )
+        row = cursor.fetchone()
+    return dict(row) if row is not None else None
+
+
 def option_contracts(
     underlying: str,
     exchange_segment: str = "nse_fo",

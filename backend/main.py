@@ -44,6 +44,9 @@ from backend.marketdata.feed import market_feed
 
 log = logging.getLogger("alphatrade")
 
+#: When the process started, so the liveness probe can report its uptime.
+_STARTED_AT = time.time()
+
 DESCRIPTION = """
 Institutional trading platform for the Indian markets.
 
@@ -155,16 +158,16 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS: the deployed Vercel frontend must be explicitly allowed. In production
-# the origin list is fixed (no regex), so a missing origin shows up as a browser
-# "Failed to fetch" / CORS error with no backend traceback.
+# CORS: the frontend is deployed on a different host (Vercel) and the API on
+# Render, and the origin changes with every preview deployment, so a fixed
+# allow-list turns into "Cannot reach the backend" for every new URL. Any
+# origin is accepted by default; ALLOWED_ORIGINS narrows it when the
+# deployment wants a locked-down list. With "*" Starlette echoes the
+# requesting origin, which keeps credentialed requests working.
+_allowed_origins = settings.allowed_origins or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://kotak-jade.vercel.app",  # deployed Vercel frontend
-        "http://localhost:3000",          # local dev
-        "http://127.0.0.1:3000",          # local dev
-    ],
+    allow_origins=["*"] if "*" in _allowed_origins else _allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -230,11 +233,34 @@ def root() -> dict[str, Any]:
         "redirect_path": settings.redirect_path,
         "docs": "/docs",
         "health": "/api/v1/system/health",
+        "ping": "/health",
         "deployment": "/api/v1/system/deployment",
         "callback": settings.redirect_path,
         "share": "/api/v1/share",
         "share_qr": "/api/v1/share/qr.png",
         "auth": "/api/v1/auth/login",
+    }
+
+
+@app.get("/health", tags=["meta"])
+def health_ping() -> dict[str, Any]:
+    """Cheap liveness probe.
+
+    Deliberately dependency-free: a monitor — or the frontend's first probe —
+    must get an answer even when the broker sessions are down, the instrument
+    master is empty, or the free-tier instance is still waking up. The
+    detailed dependency report stays on `/api/v1/system/health`.
+
+    Pointing a free-tier keep-alive (UptimeRobot, cron) at this path is what
+    stops Render from spinning the instance down between sessions.
+    """
+    return {
+        "status": "ok",
+        "service": "AlphaTradePro",
+        "version": "1.0.0",
+        "time": time.time(),
+        "uptime_seconds": round(time.time() - _STARTED_AT, 3),
+        "environment": settings.environment,
     }
 
 

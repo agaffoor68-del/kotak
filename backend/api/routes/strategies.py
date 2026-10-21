@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
-from datetime import date
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
 from typing import Any, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -17,7 +19,7 @@ from backend.core.config import settings
 from backend.core.database import app_cursor, now, row_to_dict
 from backend.execution import algo
 from backend.marketdata import master, ticks
-from backend.marketdata.timeutils import ist_stamp, parse_ist, window as ist_window
+from backend.marketdata.timeutils import ist_stamp, now_ist, parse_ist, window as ist_window
 from backend.strategies import dsl, lifecycle, pine
 from backend.strategies.dsl import COMPARATORS, CROSS_OPS, PRICE_FIELDS
 from backend.strategies.indicators import available
@@ -71,9 +73,22 @@ class BacktestRequest(BaseModel):
         return value.strip()
 
 
+class AutoBacktestRequest(BacktestRequest):
+    """A one-click backtest: a symbol in, the result out.
+
+    The symbol is resolved against the instrument master, the database is
+    checked for the requested window, and whatever is missing is downloaded
+    before the simulation runs - all inside one request.
+    """
+
+    symbol: str | None = Field(default=None, min_length=1, max_length=120)
+    exchange_segment: str | None = Field(default=None, max_length=32)
+    auto_download: bool = True
+    download_timeout_seconds: int = Field(default=240, ge=30, le=1800)
+
+
 class StartRunRequest(BaseModel):
     mode: str = Field(default="paper", pattern="^(paper|live)$")
-
 
 class PineImportRequest(BaseModel):
     code: str = Field(min_length=1)
@@ -327,6 +342,365 @@ def _angel_bridge(user: CurrentUser) -> Callable[..., dict[str, Any]] | None:
         return None
 
 
+def _load_definition(strategy_id: str | None, definition: dict[str, Any] | None) -> dict[str, Any]:
+    """The strategy document to simulate, from the request or the database."""
+    if definition is not None:
+        return definition
+    if strategy_id:
+        with app_cursor() as cursor:
+            cursor.execute("SELECT definition FROM strategies WHERE id = ?", (strategy_id,))
+            row = cursor.fetchone()
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Strategy not found")
+        return json.loads(row["definition"])
+    raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Provide a strategy_id or a definition")
+
+
+def _resolve_interval(timeframe: str | None, definition: dict[str, Any]) -> str:
+    interval = timeframe or definition.get("timeframe") or "5m"
+    if interval not in ticks.INTERVAL_SECONDS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Unsupported timeframe '{interval}'.")
+    return interval
+
+
+def _parse_window(start_date: str | None, end_date: str | None) -> tuple[float | None, float | None]:
+    """Epoch bounds for a user-supplied date range, read on the IST clock.
+
+    The bars are stamped from IST wall-clock readings, so the window must be
+    built on the same clock: reading a naive date as UTC shifts the whole
+    window by five and a half hours and drops the session.
+    """
+
+    def parse(value: str | None, end: bool = False) -> float | None:
+        if not value:
+            return None
+        try:
+            parsed = parse_ist(value)
+            if end and len(value) == 10:
+                parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=999_999)
+            return parsed.timestamp()
+        except ValueError as error:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Invalid date: {value}") from error
+
+    start_ts = parse(start_date)
+    end_ts = parse(end_date, end=True)
+    if start_ts is not None and end_ts is not None and start_ts > end_ts:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "start_date must be before end_date")
+    return start_ts, end_ts
+
+
+def _universe_for(
+    definition: dict[str, Any],
+    token: str | None,
+    label: str | None = None,
+) -> list[dict[str, Any]]:
+    """The instruments the backtest runs over.
+
+    A selected token is authoritative: it replaces the strategy's own
+    universe, so the same strategy can be replayed on any instrument.
+    """
+    universe = definition.get("universe") or []
+    if token:
+        instrument = master.get_instrument(token, "nse_cm") or master.get_instrument(token, "nse_fo")
+        universe = [{
+            "token": token,
+            "exchange_segment": (instrument or {}).get("exchange_segment", "nse_cm"),
+            "label": label or (instrument or {}).get("trading_symbol") or (instrument or {}).get("name") or token,
+        }]
+    return universe
+
+
+def _collect_candles(
+    universe: list[dict[str, Any]],
+    interval: str,
+    start_ts: float | None,
+    end_ts: float | None,
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+    """Read the stored candles for every instrument in the universe."""
+    candles_by_symbol: dict[str, list[dict[str, Any]]] = {}
+    coverage: list[dict[str, Any]] = []
+    for item in universe:
+        token = str(item["token"])
+        segment = item.get("exchange_segment", "nse_cm")
+        # The token is the key: the rows are stored under exactly the token the
+        # downloader was given, so the query reads them under the same string.
+        candles = ticks.stored_history(token, segment, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
+        if not candles:
+            # The download may have filed the bars under another exchange
+            # segment. The token still identifies them.
+            candles = ticks.stored_history(token, None, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
+        log.info(f"Backtest query returned {len(candles)} rows for token {token}")
+        instrument = master.get_instrument(token, segment)
+        label = (item.get("label") or (instrument or {}).get("name") or token)
+        candles_by_symbol[label] = candles
+        coverage.append({"label": label, "token": token, "bars": len(candles), "coverage": {**ticks.coverage(token, segment), "stored_bars": len(candles)}})
+    return candles_by_symbol, coverage
+
+
+def _simulate(
+    definition: dict[str, Any],
+    candles_by_symbol: dict[str, list[dict[str, Any]]],
+    coverage: list[dict[str, Any]],
+    interval: str,
+    initial_capital: float,
+    slippage: str,
+    strategy_id: str | None,
+    user: CurrentUser,
+) -> dict[str, Any]:
+    """Run the engine and record the run for the approval lifecycle."""
+    result = engine.run(
+        definition, candles_by_symbol,
+        initial_capital=initial_capital, slippage=slippage, timeframe=interval,
+    )
+    payload_dict = result.to_dict()
+
+    # Persist the run so the approval lifecycle has evidence to check. Without
+    # this a strategy could never legitimately reach "backtested".
+    if strategy_id:
+        with app_cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO strategy_runs
+                    (id, strategy_id, account_id, mode, status, params, metrics, started_at, finished_at)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    uuid.uuid4().hex, strategy_id, resolve_account_id(user), "backtest", "completed",
+                    json.dumps({
+                        "initial_capital": initial_capital,
+                        "slippage": slippage,
+                        "interval": interval,
+                    }),
+                    json.dumps(payload_dict.get("metrics") or {}),
+                    now(), now(),
+                ),
+            )
+
+    return {**payload_dict, "coverage": coverage, "interval": interval}
+
+
+def _no_data_result(
+    coverage: list[dict[str, Any]],
+    interval: str,
+    token: str | None,
+    error: str,
+) -> dict[str, Any]:
+    return {
+        "status": "no_data", "error": error, "note": "", "metrics": {}, "trades": [],
+        "equity_curve": [], "drawdown_curve": [], "bars": 0, "warnings": [],
+        "coverage": coverage, "interval": interval, "symbol_token": token,
+    }
+
+
+@router.post("/backtest")
+def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    """Backtest a strategy over persisted historical candles."""
+    if not settings.enable_backtest:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Backtesting is disabled.")
+
+    definition = _load_definition(payload.strategy_id, payload.definition)
+    interval = _resolve_interval(payload.timeframe, definition)
+    start_ts, end_ts = _parse_window(payload.start_date, payload.end_date)
+
+    requested = payload.symbol_token or None
+    universe = _universe_for(definition, requested)
+    candles_by_symbol, coverage = _collect_candles(universe, interval, start_ts, end_ts)
+
+    if requested and not candles_by_symbol.get(next(iter(candles_by_symbol), "")):
+        label = (coverage[0]["label"] if coverage else requested)
+        stored = ticks.stored_range(requested, interval)
+        if stored["bars"]:
+            error = (
+                f"No historical data found for {label} between {payload.start_date or 'the start'} and "
+                f"{payload.end_date or 'the end'} (IST). Stored: {stored['bars']} bars from "
+                f"{ist_stamp(stored['first_bar'])} to {ist_stamp(stored['last_bar'])}."
+            )
+        else:
+            error = f"No data in DB for token {requested}. Run the downloader first."
+        return _no_data_result(coverage, interval, requested, error)
+
+    return _simulate(
+        definition, candles_by_symbol, coverage, interval,
+        payload.initial_capital, payload.slippage, payload.strategy_id, user,
+    )
+
+
+@backtest_router.post("/run")
+def run_backtest(payload: AutoBacktestRequest, user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    """Run a backtest end to end: resolve the symbol, fetch what is missing, simulate.
+
+    One click, one answer. The database is checked for the requested window
+    first; whatever is missing is downloaded (yfinance, with Angel One as the
+    fallback) and written under the instrument's exact token, and the
+    simulation then runs over those candles. The response carries the
+    result - win rate, P&L, trades - and what the download step did.
+    """
+    if not settings.enable_backtest:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Backtesting is disabled.")
+
+    definition = _load_definition(payload.strategy_id, payload.definition)
+    interval = _resolve_interval(payload.timeframe, definition)
+
+    instrument = _resolve_instrument(payload, definition)
+    token = str(instrument["token"])
+    segment = str(instrument.get("exchange_segment") or "nse_cm")
+    label = str(instrument.get("trading_symbol") or instrument.get("symbol") or token)
+
+    # The window: the dates the user typed, or the last N days.
+    if payload.start_date or payload.end_date:
+        start_ts, end_ts = _parse_window(payload.start_date, payload.end_date)
+        start, end = ist_window(payload.start_date or payload.end_date, payload.end_date or payload.start_date)
+    else:
+        end = now_ist()
+        start = end - timedelta(days=max(1, payload.history_days))
+        start_ts, end_ts = start.timestamp(), end.timestamp()
+
+    # 1. What the database already holds.
+    candles = ticks.stored_history(token, segment, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
+    if not candles:
+        candles = ticks.stored_history(token, None, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
+
+    download: dict[str, Any] = {
+        "attempted": False, "performed": False, "bars": 0,
+        "source": None, "error": None, "seconds": 0.0,
+    }
+
+    # 2. Anything missing is downloaded, in a worker thread, and waited for.
+    if payload.auto_download and _needs_download(candles, start_ts, end_ts, interval):
+        download = _download_missing(token, segment, interval, start, end, payload, user)
+
+    # 3. The freshly written bars are what the simulation reads.
+    candles = ticks.stored_history(token, segment, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
+    if not candles:
+        candles = ticks.stored_history(token, None, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
+
+    universe = _universe_for(definition, token, label)
+    candles_by_symbol, coverage = _collect_candles(universe, interval, start_ts, end_ts)
+
+    if not candles_by_symbol.get(next(iter(candles_by_symbol), "")):
+        stored = ticks.stored_range(token, interval)
+        if stored["bars"]:
+            error = (
+                f"No historical data found for {label} between {payload.start_date or 'the start'} and "
+                f"{payload.end_date or 'the end'} (IST). Stored: {stored['bars']} bars from "
+                f"{ist_stamp(stored['first_bar'])} to {ist_stamp(stored['last_bar'])}."
+            )
+        else:
+            error = f"No data in DB for token {token}. Run the downloader first."
+        return {**_no_data_result(coverage, interval, token, error), "download": download, "symbol": label}
+
+    result = _simulate(
+        definition, candles_by_symbol, coverage, interval,
+        payload.initial_capital, payload.slippage, payload.strategy_id, user,
+    )
+    return {
+        **result,
+        "download": download,
+        "symbol": label,
+        "symbol_token": token,
+        "exchange_segment": segment,
+    }
+
+
+def _resolve_instrument(payload: AutoBacktestRequest, definition: dict[str, Any]) -> dict[str, Any]:
+    """The instrument the backtest runs over, from a symbol or a token."""
+    if payload.symbol_token:
+        token = str(payload.symbol_token).strip()
+        instrument = (
+            master.get_instrument(token, "nse_cm")
+            or master.get_instrument(token, "nse_fo")
+            or master.find_instrument(token)
+        )
+        if instrument is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"No instrument in the master for token {token}")
+        return instrument
+
+    if payload.symbol:
+        instrument = master.find_instrument(payload.symbol, payload.exchange_segment)
+        if instrument is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                f"No instrument in the master for '{payload.symbol}'. Search the symbol list to pick one.",
+            )
+        return instrument
+
+    universe = definition.get("universe") or []
+    if universe:
+        token = str(universe[0].get("token") or "")
+        instrument = (
+            master.get_instrument(token, "nse_cm")
+            or master.get_instrument(token, "nse_fo")
+            or master.find_instrument(token)
+        )
+        if instrument is not None:
+            return instrument
+
+    raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Select the symbol to backtest")
+
+
+def _needs_download(
+    candles: list[dict[str, Any]],
+    start_ts: float | None,
+    end_ts: float | None,
+    interval: str,
+) -> bool:
+    """True when the stored bars do not cover the requested window."""
+    if not candles:
+        return True
+    if start_ts is None or end_ts is None:
+        return False
+    seconds = ticks.INTERVAL_SECONDS[interval]
+    first = float(candles[0]["time"])
+    last = float(candles[-1]["time"])
+    return first > start_ts + seconds or last < end_ts - seconds
+
+
+def _download_missing(
+    token: str,
+    segment: str,
+    interval: str,
+    start: Any,
+    end: Any,
+    payload: AutoBacktestRequest,
+    user: CurrentUser,
+) -> dict[str, Any]:
+    """Download the missing history in a worker thread and wait for it.
+
+    The thread keeps the API responsive while the download runs, and the
+    request waits for it: the whole point of this endpoint is that one click
+    produces one result.
+    """
+    from backend.marketdata.yf_historical_loader import HistoricalDataError, download_history
+
+    summary: dict[str, Any] = {"attempted": True, "performed": False, "bars": 0, "source": None, "error": None, "seconds": 0.0}
+    started = time.time()
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="backtest-download")
+    try:
+        future = pool.submit(
+            download_history, token, segment, interval, start, end,
+            angel_call=_angel_bridge(user),
+        )
+        try:
+            result = future.result(timeout=max(30, payload.download_timeout_seconds))
+        except TimeoutError:
+            summary["error"] = f"The historical download did not finish within {payload.download_timeout_seconds}s."
+            log.warning("Historical download timed out for %s", token)
+        except HistoricalDataError as error:
+            summary["error"] = str(error)
+            log.warning("Historical download failed for %s: %s", token, error)
+        else:
+            summary["performed"] = True
+            summary["source"] = result.get("source")
+            summary["bars"] = int(result.get("rows") or 0)
+            summary["yf_ticker"] = result.get("yf_ticker")
+    finally:
+        # The download keeps running in the background if it timed out; the
+        # request does not wait for it.
+        pool.shutdown(wait=False)
+    summary["seconds"] = round(time.time() - started, 2)
+    return summary
+
+
 @backtest_router.post("/download-data")
 def download_historical_data(
     payload: HistoricalDownloadRequest,
@@ -392,118 +766,4 @@ def download_historical_data(
         "end_date": payload.end_date.isoformat(),
     }
 
-
-@router.post("/backtest")
-def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
-    """Backtest a strategy over persisted historical candles."""
-    if not settings.enable_backtest:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Backtesting is disabled.")
-
-    definition = payload.definition
-    if definition is None and payload.strategy_id:
-        with app_cursor() as cursor:
-            cursor.execute("SELECT definition FROM strategies WHERE id = ?", (payload.strategy_id,))
-            row = cursor.fetchone()
-        if row is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Strategy not found")
-        definition = json.loads(row["definition"])
-    if definition is None:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Provide a strategy_id or a definition")
-
-    interval = payload.timeframe or definition.get("timeframe") or "5m"
-    if interval not in ticks.INTERVAL_SECONDS:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Unsupported timeframe '{interval}'.",
-        )
-
-    def parse_date(value: str | None, end: bool = False) -> float | None:
-        """Epoch seconds for a user-supplied date, in **IST**.
-
-        The bars are stamped from IST wall-clock readings, so the window must
-        be built on the same clock: reading a naive date as UTC shifts the
-        whole window by five and a half hours and drops the session.
-        """
-        if not value:
-            return None
-        try:
-            parsed = parse_ist(value)
-            if end and len(value) == 10:
-                parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=999_999)
-            return parsed.timestamp()
-        except ValueError as error:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Invalid date: {value}") from error
-
-    start_ts = parse_date(payload.start_date)
-    end_ts = parse_date(payload.end_date, end=True)
-    if start_ts is not None and end_ts is not None and start_ts > end_ts:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "start_date must be before end_date")
-
-    # A selected token is authoritative and is read directly from the durable candle DB.
-    requested = payload.symbol_token or None
-    universe = definition.get("universe") or []
-    if requested:
-        instrument = master.get_instrument(requested, "nse_cm") or master.get_instrument(requested, "nse_fo")
-        universe = [{"token": requested, "exchange_segment": (instrument or {}).get("exchange_segment", "nse_cm"), "label": (instrument or {}).get("trading_symbol") or (instrument or {}).get("name") or requested}]
-
-    candles_by_symbol: dict[str, list[dict[str, Any]]] = {}
-    coverage: list[dict[str, Any]] = []
-    for item in universe:
-        token = str(item["token"])
-        segment = item.get("exchange_segment", "nse_cm")
-        # The token is the key: the rows are stored under exactly the token the
-        # downloader was given, so the query reads them under the same string.
-        candles = ticks.stored_history(token, segment, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
-        if not candles:
-            # The download may have filed the bars under another exchange
-            # segment. The token still identifies them.
-            candles = ticks.stored_history(token, None, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
-        log.info(f"Backtest query returned {len(candles)} rows for token {token}")
-        instrument = master.get_instrument(token, segment)
-        label = (item.get("label") or (instrument or {}).get("name") or token)
-        candles_by_symbol[label] = candles
-        coverage.append({"label": label, "token": token, "bars": len(candles), "coverage": {**ticks.coverage(token, segment), "stored_bars": len(candles)}})
-
-    if requested and not candles_by_symbol.get(next(iter(candles_by_symbol), "")):
-        label = (coverage[0]["label"] if coverage else requested)
-        stored = ticks.stored_range(requested, interval)
-        if stored["bars"]:
-            error = (
-                f"No historical data found for {label} between {payload.start_date or 'the start'} and "
-                f"{payload.end_date or 'the end'} (IST). Stored: {stored['bars']} bars from "
-                f"{ist_stamp(stored['first_bar'])} to {ist_stamp(stored['last_bar'])}."
-            )
-        else:
-            error = f"No data in DB for token {requested}. Run the downloader first."
-        return {"status": "no_data", "error": error, "note": "", "metrics": {}, "trades": [], "equity_curve": [], "drawdown_curve": [], "bars": 0, "warnings": [], "coverage": coverage, "interval": interval}
-
-    result = engine.run(
-        definition, candles_by_symbol,
-        initial_capital=payload.initial_capital, slippage=payload.slippage, timeframe=interval,
-    )
-    payload_dict = result.to_dict()
-
-    # Persist the run so the approval lifecycle has evidence to check. Without
-    # this a strategy could never legitimately reach "backtested".
-    if payload.strategy_id:
-        with app_cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO strategy_runs
-                    (id, strategy_id, account_id, mode, status, params, metrics, started_at, finished_at)
-                VALUES (?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    uuid.uuid4().hex, payload.strategy_id, resolve_account_id(user), "backtest", "completed",
-                    json.dumps({
-                        "initial_capital": payload.initial_capital,
-                        "slippage": payload.slippage,
-                        "interval": interval,
-                    }),
-                    json.dumps(payload_dict.get("metrics") or {}),
-                    now(), now(),
-                ),
-            )
-
-    return {**payload_dict, "coverage": coverage, "interval": interval}
 

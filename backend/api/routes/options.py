@@ -32,11 +32,20 @@ router = APIRouter(prefix="/api/v1/options", tags=["options"])
 _QUOTE_BATCH = 50
 
 #: The pause between two quote requests. SmartAPI allows three requests a
-#: second; 0.35s keeps the chain inside that budget.
-_QUOTE_BATCH_DELAY = 0.35
+#: second; 0.4s keeps the chain inside that budget with room to spare.
+_QUOTE_BATCH_DELAY = 0.4
 
 #: The master source whose tokens the SmartAPI quote endpoint understands.
 _ANGEL_SOURCE = "angel"
+
+#: The short names the desk uses and the index rows that carry their spot.
+_SPOT_ALIASES = {
+    "NIFTY": ("NIFTY 50",),
+    "BANKNIFTY": ("NIFTY BANK", "BANK NIFTY"),
+    "FINNIFTY": ("FIN NIFTY", "NIFTY FINANCIAL SERVICES"),
+    "MIDCPNIFTY": ("MIDCAP NIFTY", "NIFTY MIDCAP"),
+    "SENSEX": ("SENSEX",),
+}
 
 
 def _expiry_dates(underlying: str, exchange_segment: str) -> list[str]:
@@ -177,6 +186,15 @@ async def option_chain(
     spot_quote = quote_engine.cached(underlying_record["token"], underlying_record["exchange_segment"]) if underlying_record else None
     spot = spot_quote.last if spot_quote and spot_quote.last else None
     interval = strike_interval(underlying)
+
+    # The live spot decides where the strike window sits, so it is fetched
+    # before the window is computed rather than after. One extra quote
+    # request buys a chain that is actually centred on the money.
+    spot_token = str(underlying_record["token"]) if underlying_record else None
+    spot_segment = str(underlying_record["exchange_segment"]) if underlying_record else "nse_cm"
+    if spot is None and spot_token:
+        spot = await _fetch_spot(user, spot_token, spot_segment, underlying)
+
     available_strikes = sorted(float(value) for value in target_rows)
     selected_strikes = _strike_window(available_strikes, spot, interval, offset)
     if selected_strikes is not None:
@@ -307,6 +325,29 @@ def _strike_window(
     return set(closest[: max(1, 2 * max(1, offset) + 1)])
 
 
+async def _fetch_spot(
+    user: CurrentUser,
+    token: str,
+    segment: str,
+    underlying: str,
+) -> float | None:
+    """The underlying's live last traded price, straight from SmartAPI."""
+    try:
+        call = await asyncio.to_thread(angel_call, user)
+    except Exception:  # noqa: BLE001 - the chain still works without a spot
+        log.exception("Option chain could not open an Angel One session for the %s spot", underlying)
+        return None
+    try:
+        quotes = await asyncio.to_thread(angel_fetch, call, [(token, segment)], "all")
+    except Exception:  # noqa: BLE001 - the chain still works without a spot
+        log.exception("Option chain could not fetch the %s spot price", underlying)
+        return None
+    for quote in quotes:
+        if quote.last:
+            return float(quote.last)
+    return None
+
+
 async def _fetch_quotes(
     user: CurrentUser,
     keys: list[tuple[str, str]],
@@ -340,14 +381,41 @@ async def _fetch_quotes(
             errors.append(f"batch {index // _QUOTE_BATCH + 1}: {error}")
             continue
         for quote in quotes:
+            # The cache is what the paper-trading engine prices against, so the
+            # chain's quotes are stored: an order placed from this chain must
+            # fill at the price the operator is looking at.
+            quote_engine.store(quote)
             token_to_quote[str(quote.token)] = quote
     return token_to_quote, errors
 
 
 def _find_index_for(underlying: str) -> dict[str, Any] | None:
-    for index in master.indices("nse_cm") + master.indices("bse_cm"):
-        if index["symbol"].upper() == underlying.upper():
+    """The index row that carries the underlying's spot price.
+
+    The platform calls the index "NIFTY" while the instrument master lists it
+    as "NIFTY 50", so an exact match is tried first, then the known short
+    names, then a prefix match.
+    """
+    wanted = underlying.strip().upper()
+    indices = master.indices("nse_cm") + master.indices("bse_cm")
+
+    def fields(index: dict[str, Any]) -> list[str]:
+        return [
+            str(index.get(key) or "").strip().upper()
+            for key in ("symbol", "trading_symbol", "name")
+        ]
+
+    for index in indices:
+        if wanted in fields(index):
             return index
+    for alias in _SPOT_ALIASES.get(wanted, ()):
+        for index in indices:
+            if alias in fields(index):
+                return index
+    for index in indices:
+        for value in fields(index):
+            if value and (value.startswith(wanted) or wanted.startswith(value)):
+                return index
     return None
 
 

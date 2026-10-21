@@ -1,11 +1,12 @@
 "use client";
 
-/** Backtest lab: run a strategy over recorded candles and review the metrics. */
+/** Backtest lab: pick a symbol, press run, and the missing history is fetched for you. */
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { BacktestResult, StrategyRowRecord } from "@/lib/api";
+import type { BacktestResult, Instrument, StrategyRowRecord } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
+import { InstrumentSearch } from "@/components/instrument-search";
 import { PriceChart } from "@/components/price-chart";
 import { Empty, ErrorNote, Field, Loading, Metric, Panel } from "@/components/ui";
 import { inr, num, percent, signedInr, toneClass } from "@/lib/format";
@@ -49,17 +50,14 @@ function BacktestLab() {
   const [selected, setSelected] = useState<string>("");
   const [capital, setCapital] = useState(500000);
   const [slippage, setSlippage] = useState("moderate");
-  const [instrumentQuery, setInstrumentQuery] = useState("");
-  const [instruments, setInstruments] = useState<Array<{ token: string; symbol: string; trading_symbol: string; name?: string }>>([]);
-  const [symbolToken, setSymbolToken] = useState("");
+  const [instrument, setInstrument] = useState<Instrument | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [timeframe, setTimeframe] = useState("5m");
+  const [historyDays, setHistoryDays] = useState(30);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const [downloadBusy, setDownloadBusy] = useState(false);
-  const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
-  const [downloadReady, setDownloadReady] = useState(false);
+  const [stage, setStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,78 +70,41 @@ function BacktestLab() {
       .catch((failure) => setError(failure instanceof Error ? failure.message : "Could not load strategies"));
   }, []);
 
-  useEffect(() => {
-    const query = instrumentQuery.trim();
-    if (!query) {
-      setInstruments([]);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      // The backtester can run on any instrument, derivatives included.
-      api
-        .search(query, 20, "all")
-        .then((response) => setInstruments(response.results))
-        .catch(() => setInstruments([]));
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [instrumentQuery]);
-
-  async function downloadData() {
-    const token = symbolToken.trim();
-    const symbol = instrumentQuery.replace(/\s*\([^)]*\)$/, "").trim();
-    if (!token || !symbol || !startDate || !endDate) {
-      setError("Select an instrument and a start and end date before downloading historical data.");
-      return;
-    }
-    setDownloadBusy(true);
-    setDownloadMessage(null);
-    setDownloadReady(false);
-    setError(null);
-    try {
-      const response = await api.downloadHistoricalData({
-        symbol_token: token,
-        symbol,
-        start_date: startDate,
-        end_date: endDate,
-        timeframe,
-      });
-      setDownloadMessage(
-        `Data Downloaded Successfully! ${response.bars.toLocaleString()} bars saved for ${token}` +
-        `${response.yf_ticker ? ` (${response.yf_ticker})` : ""}.`,
-      );
-      setDownloadReady(true);
-    } catch {
-      setError("Failed to download data. Check token or internet.");
-    } finally {
-      setDownloadBusy(false);
-    }
-  }
-
   async function run() {
-    const token = symbolToken.trim();
     const strategyId = selected.trim();
-    if (!strategyId || !token || !downloadReady) {
-      setError("Please select an instrument, download its historical data, and then run the backtest.");
+    if (!strategyId || !instrument) {
+      setError("Select a strategy and an instrument before running the backtest.");
       return;
     }
-
-    const payload = {
-      strategy_id: strategyId,
-      initial_capital: capital,
-      slippage,
-      symbol_token: token,
-      start_date: startDate || undefined,
-      end_date: endDate || undefined,
-      timeframe,
-    };
-    console.log("[v0] Backtest payload:", payload);
 
     setBusy(true);
+    setStage("Preparing the data…");
     setResult(null);
     setError(null);
     try {
-      const nextResult = await api.backtest(payload);
+      // One request: the backend checks the database, downloads whatever is
+      // missing, and runs the simulation over the fresh candles.
+      const nextResult = await api.runBacktest({
+        strategy_id: strategyId,
+        symbol: instrument.trading_symbol || instrument.symbol,
+        symbol_token: instrument.token,
+        exchange_segment: instrument.exchange_segment,
+        initial_capital: capital,
+        slippage,
+        timeframe,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+        history_days: historyDays,
+        auto_download: true,
+      });
       setResult(nextResult);
+      if (nextResult.download?.performed) {
+        setStage(
+          `Downloaded ${num(nextResult.download.bars, 0)} bars from ${nextResult.download.source ?? "the feed"} in ${num(nextResult.download.seconds, 1)}s.`,
+        );
+      } else {
+        setStage(null);
+      }
       if (nextResult.status === "no_data" && nextResult.error) setError(nextResult.error);
     } catch (failure) {
       const apiFailure = failure as { status?: number; detail?: unknown; message?: string };
@@ -151,7 +112,7 @@ function BacktestLab() {
       const validationDetail = detail?.detail ?? apiFailure.detail;
       const hasEmptyRequiredField = Array.isArray(validationDetail) && validationDetail.some((item) => {
         const entry = item as { loc?: unknown[]; msg?: string };
-        return Array.isArray(entry.loc) && (entry.loc.includes("symbol_token") || entry.loc.includes("strategy_id")) && /empty|at least 1 character|required/i.test(entry.msg ?? "");
+        return Array.isArray(entry.loc) && (entry.loc.includes("symbol") || entry.loc.includes("strategy_id")) && /empty|at least 1 character|required/i.test(entry.msg ?? "");
       });
       setError(apiFailure.status === 422 && hasEmptyRequiredField
         ? "Please select a valid instrument or strategy before running the backtest."
@@ -185,7 +146,10 @@ function BacktestLab() {
       </header>
 
       {error ? <ErrorNote error={error} /> : null}
-      <Panel title="Configuration">
+      <Panel
+        title="Configuration"
+        subtitle="Pick a symbol and press run — missing history is downloaded automatically"
+      >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Strategy">
             <select className="field-select" value={selected} onChange={(e) => setSelected(e.target.value)}>
@@ -203,31 +167,65 @@ function BacktestLab() {
           <Field label="Starting capital (₹)">
             <input className="field-input" type="number" min={1000} step={10000} value={capital} onChange={(e) => setCapital(Number(e.target.value) || 0)} />
           </Field>
-          <Field label="Select instrument" hint="Search by symbol or token">
-            <input className="field-input" list="backtest-instruments" value={instrumentQuery} placeholder="e.g. RELIANCE or 2885" onChange={(e) => { const value = e.target.value; const tokenMatch = value.match(/\(([^)]+)\)$/) ?? value.match(/^\d+$/); setInstrumentQuery(value); setSymbolToken(tokenMatch?.[1] ?? ""); setDownloadReady(false); setDownloadMessage(null); }} />
-            <datalist id="backtest-instruments">
-              {instruments.map((instrument) => <option key={instrument.token} value={`${instrument.trading_symbol} (${instrument.token})`} />)}
-            </datalist>
-            {instruments.length ? <div className="mt-1 flex flex-col gap-1 text-3xs text-ink-faint">{instruments.slice(0, 5).map((instrument) => <button key={instrument.token} type="button" className="text-left hover:text-ink" onClick={() => { setInstrumentQuery(`${instrument.trading_symbol} (${instrument.token})`); setSymbolToken(instrument.token); }}>{instrument.trading_symbol} · token {instrument.token}</button>)}</div> : null}
+          <div className="sm:col-span-2">
+            <InstrumentSearch
+              label="Instrument"
+              scope="all"
+              placeholder="Type a symbol, e.g. NIFTY or RELIANCE"
+              onSelect={(picked) => setInstrument(picked)}
+            />
+            {instrument ? (
+              <p className="mt-1 text-3xs text-ink-faint">
+                Selected <span className="text-ink-dim">{instrument.symbol}</span> · token {instrument.token} ·{" "}
+                {instrument.exchange_segment}
+              </p>
+            ) : null}
+          </div>
+          <Field label="Start date" hint="Leave empty to use the last N days">
+            <input className="field-input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </Field>
-          <Field label="Start date"><input className="field-input" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDownloadReady(false); setDownloadMessage(null); }} /></Field>
-          <Field label="End date"><input className="field-input" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDownloadReady(false); setDownloadMessage(null); }} /></Field>
-          <Field label="Timeframe"><select className="field-select" value={timeframe} onChange={(e) => { setTimeframe(e.target.value); setDownloadReady(false); setDownloadMessage(null); }}><option value="1m">1m</option><option value="5m">5m</option><option value="15m">15m</option></select></Field>
+          <Field label="End date">
+            <input className="field-input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </Field>
+          <Field label="Timeframe">
+            <select className="field-select" value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
+              <option value="1m">1m</option>
+              <option value="5m">5m</option>
+              <option value="15m">15m</option>
+              <option value="1d">1d</option>
+            </select>
+          </Field>
           <Field label="Slippage model" hint="Applied against you on every fill">
             <select className="field-select" value={slippage} onChange={(e) => setSlippage(e.target.value)}>
               {SLIPPAGE.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </Field>
-          <div className="flex flex-col justify-end gap-2">
-            {downloadMessage ? <p role="status" className="text-3xs text-up">{downloadMessage}</p> : null}
-            <button className="btn btn-secondary w-full" onClick={() => void downloadData()} disabled={downloadBusy || busy} type="button">
-              {downloadBusy ? <Spinner /> : null}
-              {downloadBusy ? "Downloading…" : "Download historical data"}
-            </button>
-            <button className="btn btn-primary w-full" onClick={() => void run()} disabled={busy || downloadBusy || !selected || !downloadReady} title={downloadReady ? undefined : "Download the historical data first"} type="button">
-              {busy ? <Spinner /> : null}
-              {busy ? "Running…" : "Run backtest"}
-            </button>
+          {!startDate && !endDate ? (
+            <Field label="History window (days)">
+              <input
+                className="field-input"
+                type="number"
+                min={1}
+                max={1800}
+                value={historyDays}
+                onChange={(e) => setHistoryDays(Math.max(1, Number(e.target.value) || 1))}
+              />
+            </Field>
+          ) : null}
+          <div className="flex flex-col justify-end gap-2 sm:col-span-2 lg:col-span-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                className="btn btn-primary"
+                onClick={() => void run()}
+                disabled={busy || !selected || !instrument}
+                title={instrument ? undefined : "Pick an instrument first"}
+                type="button"
+              >
+                {busy ? <Spinner /> : null}
+                {busy ? "Running…" : "Run backtest"}
+              </button>
+              {stage ? <p className="text-3xs text-ink-faint" role="status">{stage}</p> : null}
+            </div>
           </div>
         </div>
       </Panel>
