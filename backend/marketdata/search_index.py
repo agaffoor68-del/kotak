@@ -32,7 +32,11 @@ from backend.core.database import app_cursor
 log = logging.getLogger("alphatrade.search")
 
 #: The cash segments that make up the in-memory index.
-INDEXED_SEGMENTS = ("nse_cm", "bse_cm")
+INDEXED_SEGMENTS = ("nse_cm", "bse_cm", "nse_fo", "bse_fo")
+
+INDEX_TYPES = {"INDEX", "IDX", "FUTIDX", "OPTIDX", "AMXIDX"}
+INDEX_QUERY_ALIASES = {"NIFTY", "NIFTY50", "BANKNIFTY", "NIFTYBANK", "FINNIFTY", "MIDCPNIFTY", "SENSEX"}
+BROAD_INDEX_EXCLUSIONS = ("ETF", "ADD", "AXIS", "GSEC")
 
 #: A rebuild is a safety net, not the primary invalidation path: the master is
 #: invalidated explicitly whenever it is re-synced.
@@ -75,6 +79,7 @@ class Entry:
     trading_symbol: str
     name: str
     is_index: int
+    instrument_type: str | None
     series: str | None
     lot_size: int | None
     tick_size: float | None
@@ -91,6 +96,7 @@ class Entry:
             "trading_symbol": self.trading_symbol,
             "name": self.name,
             "is_index": self.is_index,
+            "instrument_type": self.instrument_type,
             "series": self.series,
             "lot_size": self.lot_size,
             "tick_size": self.tick_size,
@@ -126,6 +132,7 @@ def _entry(row: dict[str, Any]) -> Entry | None:
         trading_symbol=trading_symbol or symbol,
         name=name or symbol,
         is_index=int(row.get("is_index") or 0),
+        instrument_type=str(row.get("instrument_type") or "").strip().upper() or None,
         series=row.get("series"),
         lot_size=row.get("lot_size"),
         tick_size=row.get("tick_size"),
@@ -176,7 +183,7 @@ def _build() -> _Index:
         cursor.execute(
             """
             SELECT token, exchange_segment, symbol, trading_symbol, name, series,
-                   is_index, lot_size, tick_size
+                   instrument_type, is_index, lot_size, tick_size
             FROM instruments
             WHERE exchange_segment IN (?, ?)
             """,
@@ -226,9 +233,18 @@ def _rank(index: _Index, needle: str, limit: int) -> list[dict[str, Any]]:
     `listings` instead of taking a slot of its own.
     """
     compact_needle = compact(needle)
+    broad_index_query = compact_needle in INDEX_QUERY_ALIASES
     scored: dict[tuple[str, str], tuple[int, Entry]] = {}
 
     def offer(entry: Entry, tier: int) -> None:
+        # Broad index searches must never leak similarly-prefixed equities or
+        # ETFs. Stock searches retain the normal EQ behaviour.
+        if broad_index_query:
+            searchable = f"{entry.symbol} {entry.trading_symbol} {entry.name}".upper()
+            if entry.instrument_type not in INDEX_TYPES and not entry.is_index:
+                return
+            if any(term in searchable for term in BROAD_INDEX_EXCLUSIONS):
+                return
         identity = (entry.token, entry.exchange_segment)
         current = scored.get(identity)
         if current is None or tier < current[0]:
@@ -255,7 +271,10 @@ def _rank(index: _Index, needle: str, limit: int) -> list[dict[str, Any]]:
 
     grouped: dict[str, list[Entry]] = {}
     for _tier, entry in ranked:
-        grouped.setdefault(entry.symbol, []).append(entry)
+        group_key = compact(entry.symbol)
+        if entry.is_index and group_key in {"NIFTY", "NIFTY50"}:
+            group_key = "NIFTY50"
+        grouped.setdefault(group_key, []).append(entry)
 
     results: list[dict[str, Any]] = []
     for entries in grouped.values():
@@ -264,6 +283,7 @@ def _rank(index: _Index, needle: str, limit: int) -> list[dict[str, Any]]:
             key=lambda entry: (
                 0 if entry.exchange_segment == "nse_cm" else 1,
                 0 if entry.exchange_segment == "bse_cm" else 1,
+                0 if entry.token.startswith("999") else 1,
                 entry.token,
             ),
         )
