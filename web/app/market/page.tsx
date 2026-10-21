@@ -4,11 +4,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { Candle, Coverage, Instrument } from "@/lib/api";
+import type { Candle, Coverage, Instrument, Quote, WatchlistItem } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
+import { InstrumentSearch } from "@/components/instrument-search";
 import { PriceChart } from "@/components/price-chart";
 import type { ChartStyle, Overlay } from "@/components/price-chart";
-import { Empty, ErrorNote, Field, Loading, Panel } from "@/components/ui";
+import { Empty, ErrorNote, Loading, Panel } from "@/components/ui";
 import { compactInt, num, percent, relative, toneClass } from "@/lib/format";
 import { quoteKey, useLiveFeed } from "@/lib/useLiveFeed";
 
@@ -24,6 +25,27 @@ const STYLES: { value: ChartStyle; label: string }[] = [
   { value: "area", label: "Area" },
 ];
 
+/** The major indices, which always have a known instrument token. */
+const DEFAULT_WATCHLIST: Instrument[] = [
+  { token: "26000", exchange_segment: "nse_cm", symbol: "NIFTY", trading_symbol: "NIFTY", name: "NIFTY 50", is_index: 1 },
+  { token: "26009", exchange_segment: "nse_cm", symbol: "BANKNIFTY", trading_symbol: "BANKNIFTY", name: "NIFTY BANK", is_index: 1 },
+  { token: "26037", exchange_segment: "nse_cm", symbol: "FINNIFTY", trading_symbol: "FINNIFTY", name: "FIN NIFTY", is_index: 1 },
+  { token: "26074", exchange_segment: "nse_cm", symbol: "MIDCPNIFTY", trading_symbol: "MIDCPNIFTY", name: "MIDCAP NIFTY", is_index: 1 },
+  { token: "99919000", exchange_segment: "bse_cm", symbol: "SENSEX", trading_symbol: "SENSEX", name: "S&P BSE SENSEX", is_index: 1 },
+];
+
+/** A saved watchlist row is enough to quote and chart the instrument. */
+function toInstrument(item: WatchlistItem): Instrument {
+  return {
+    token: item.token,
+    exchange_segment: item.exchange_segment,
+    symbol: item.symbol,
+    trading_symbol: item.symbol,
+    name: item.name ?? item.symbol,
+    is_index: 0,
+  };
+}
+
 const OVERLAY_PRESETS: { id: string; label: string; color: string; build: (closes: number[]) => Overlay }[] = [
   { id: "ema20", label: "EMA 20", color: "#F59E0B", build: (c) => ({ name: "ema20", color: "#F59E0B", values: ema(c, 20) }) },
   { id: "ema50", label: "EMA 50", color: "#A855F7", build: (c) => ({ name: "ema50", color: "#A855F7", values: ema(c, 50) }) },
@@ -35,8 +57,6 @@ function MarketWatch() {
   const feed = useLiveFeed();
   const [watch, setWatch] = useState<WatchRow[]>([]);
   const [selected, setSelected] = useState<WatchRow | null>(null);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Instrument[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -48,22 +68,42 @@ function MarketWatch() {
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Start with the major indices, which always have a known instrument token.
+  // Load the saved watchlist; seed it with the indices the first time.
   useEffect(() => {
-    const seeds: Instrument[] = [
-      { token: "26000", exchange_segment: "nse_cm", symbol: "NIFTY", trading_symbol: "NIFTY", name: "NIFTY 50", is_index: 1 },
-      { token: "26009", exchange_segment: "nse_cm", symbol: "BANKNIFTY", trading_symbol: "BANKNIFTY", name: "NIFTY BANK", is_index: 1 },
-      { token: "26037", exchange_segment: "nse_cm", symbol: "FINNIFTY", trading_symbol: "FINNIFTY", name: "FIN NIFTY", is_index: 1 },
-      { token: "26074", exchange_segment: "nse_cm", symbol: "MIDCPNIFTY", trading_symbol: "MIDCPNIFTY", name: "MIDCAP NIFTY", is_index: 1 },
-      { token: "99919000", exchange_segment: "bse_cm", symbol: "SENSEX", trading_symbol: "SENSEX", name: "S&P BSE SENSEX", is_index: 1 },
-    ];
-    setWatch(seeds.map((instrument) => ({ instrument })));
-    setSelected({ instrument: seeds[0] });
-    // Index quotes are needed from the moment the page mounts.
-    feed.subscribe(
-      seeds.map((entry) => ({ instrument_token: entry.token, exchange_segment: entry.exchange_segment })),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let active = true;
+    api
+      .watchlist()
+      .then((response) => {
+        if (!active) return;
+        if (response.items.length) {
+          const rows = response.items.map((item) => ({ instrument: toInstrument(item) }));
+          setWatch(rows);
+          setSelected({ instrument: rows[0].instrument });
+          return;
+        }
+        setWatch(DEFAULT_WATCHLIST.map((instrument) => ({ instrument })));
+        setSelected({ instrument: DEFAULT_WATCHLIST[0] });
+        api
+          .addToWatchlist(
+            DEFAULT_WATCHLIST.map((instrument) => ({
+              token: instrument.token,
+              symbol: instrument.symbol,
+              exchange_segment: instrument.exchange_segment,
+            })),
+          )
+          .catch(() => {
+            /* Seeding is a convenience; the watchlist still works locally. */
+          });
+      })
+      .catch((failure) => {
+        if (!active) return;
+        setWatch(DEFAULT_WATCHLIST.map((instrument) => ({ instrument })));
+        setSelected({ instrument: DEFAULT_WATCHLIST[0] });
+        setError(failure instanceof Error ? failure.message : "Could not load the watchlist");
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Keep the backend subscription aligned with the watchlist.
@@ -98,30 +138,6 @@ function MarketWatch() {
     };
   }, [selected, interval]);
 
-  // Debounced instrument search against the scrip master.
-  useEffect(() => {
-    const term = query.trim();
-    if (term.length < 2) {
-      setResults([]);
-      setSearchError(null);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const response = await api.search(term, 20);
-        setResults(response.results);
-        setSearchError(null);
-      } catch (failure) {
-        setResults([]);
-        setSearchError(failure instanceof Error ? failure.message : "Search failed");
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [query]);
-
   const overlaysToDraw = useMemo<Overlay[]>(() => {
     if (!candles.length) return [];
     const closes = candles.map((candle) => candle.close);
@@ -146,16 +162,42 @@ function MarketWatch() {
     });
   }, [candles, overlays]);
 
-  const addInstrument = useCallback((instrument: Instrument) => {
-    setWatch((current) =>
-      current.some((row) => row.instrument.token === instrument.token && row.instrument.exchange_segment === instrument.exchange_segment)
-        ? current
-        : [...current, { instrument }],
-    );
-    setSelected({ instrument });
-    setQuery("");
-    setResults([]);
-  }, []);
+  /**
+   * Add the chosen instrument to the watchlist.
+   *
+   * The dropdown hands over the symbol and the symbol token; the backend
+   * stores the pair under the token it can quote, and the same token is what
+   * the live feed subscribes to.
+   */
+  const addInstrument = useCallback(
+    (instrument: Instrument) => {
+      setWatch((current) =>
+        current.some(
+          (row) =>
+            row.instrument.token === instrument.token &&
+            row.instrument.exchange_segment === instrument.exchange_segment,
+        )
+          ? current
+          : [...current, { instrument }],
+      );
+      setSelected({ instrument });
+      setSearching(true);
+      setSearchError(null);
+      api
+        .addToWatchlist([
+          {
+            token: instrument.token,
+            symbol: instrument.symbol,
+            exchange_segment: instrument.exchange_segment,
+          },
+        ])
+        .catch((failure) =>
+          setSearchError(failure instanceof Error ? failure.message : "Could not save the watchlist"),
+        )
+        .finally(() => setSearching(false));
+    },
+    [],
+  );
 
   const live = selected ? feed.quotes[quoteKey(selected.instrument.token, selected.instrument.exchange_segment)] : undefined;
 
@@ -219,43 +261,10 @@ function MarketWatch() {
             </ul>
           </Panel>
 
-          <Panel title="Add instrument" subtitle="Search every NSE and BSE scrip in the master">
-            <Field label="Search">
-              <input
-                className="field-input"
-                placeholder="RELIANCE, INFY, HDFCBANKâ€¦"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </Field>
+          <Panel title="Add instrument" subtitle="Search the local NSE and BSE symbol master">
+            <InstrumentSearch onSelect={addInstrument} />
             {searchError ? <p className="mt-2 text-3xs text-warn">{searchError}</p> : null}
-            {searching ? <Loading label="Searching" /> : null}
-            {!searching && query.trim().length >= 2 && !results.length && !searchError ? (
-              <p className="mt-2 text-3xs text-ink-faint">No matches in the symbol master.</p>
-            ) : null}
-            {results.length ? (
-              <ul className="mt-2 max-h-72 space-y-0.5 overflow-y-auto">
-                {results.map((instrument) => (
-                  <li key={`${instrument.exchange_segment}:${instrument.token}`}>
-                    <button
-                      className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left hover:bg-elevated"
-                      onClick={() => addInstrument(instrument)}
-                      type="button"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-2xs font-medium">{instrument.trading_symbol}</span>
-                        <span className="block truncate text-3xs text-ink-faint">
-                          {instrument.name ?? instrument.symbol}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-3xs text-ink-faint">
-                        {instrument.option_type ? `${instrument.option_type} ${num(instrument.strike, 0)}` : instrument.exchange_segment}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            {searching ? <p className="mt-2 text-3xs text-ink-faint">Saving to the watchlist…</p> : null}
           </Panel>
         </div>
 
@@ -324,11 +333,42 @@ function MarketWatch() {
 
 function QuoteDetail({ token, segment }: { token: string; segment: string }) {
   const feed = useLiveFeed();
-  const quote = feed.quotes[quoteKey(token, segment)];
+  const live = feed.quotes[quoteKey(token, segment)];
+  const [snapshot, setSnapshot] = useState<Quote | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Ask the backend for a fresh snapshot by token. The backend resolves the
+  // token in the master, calls Angel One with the right exchange and answers
+  // with the LTP, the day's OHLC and the volume.
+  async function refresh() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await api.quote(token, segment, true);
+      setSnapshot(response.quote);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not fetch the quote");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const quote = snapshot ?? live;
   if (!quote) return null;
   return (
-    <Panel title="Live quote detail" subtitle={quote.last === null ? "no price yet" : `updated ${relative(quote.updated_at)} ago`}>
+    <Panel
+      title="Live quote detail"
+      subtitle={quote.last === null ? "no price yet" : `updated ${relative(quote.updated_at)} ago`}
+      actions={
+        <button className="btn btn-sm" type="button" onClick={() => void refresh()} disabled={busy}>
+          {busy ? "Refreshing…" : "Refresh quote"}
+        </button>
+      }
+    >
+      {error ? <p className="mb-2 text-3xs text-warn">{error}</p> : null}
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-2xs sm:grid-cols-4">
+        <Stat label="LTP" value={num(quote.last)} />
         <Stat label="Open" value={num(quote.open)} />
         <Stat label="High" value={num(quote.high)} />
         <Stat label="Low" value={num(quote.low)} />
@@ -338,7 +378,7 @@ function QuoteDetail({ token, segment }: { token: string; segment: string }) {
         <Stat label="Volume" value={compactInt(quote.volume)} />
         <Stat label="Open interest" value={compactInt(quote.open_interest)} />
         <Stat label="VWAP" value={num(quote.average_price)} />
-        <Stat label="IV" value={quote.implied_volatility ? `${num(quote.implied_volatility)}%` : "â€”"} />
+        <Stat label="IV" value={quote.implied_volatility ? `${num(quote.implied_volatility)}%` : "—"} />
         <Stat label="Upper circuit" value={num(quote.upper_circuit)} />
         <Stat label="Lower circuit" value={num(quote.lower_circuit)} />
       </dl>

@@ -1,0 +1,91 @@
+﻿python : C:\Users\SEMISTAR\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\testclient.py:1: 
+StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+At line:1 char:145
++ ... s\SEMISTAR\Downloads\kotak; python -m backend._smoke_api 2>&1 | Out-F ...
++                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\SEMIST...ttpx2` instead.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  from starlette.testclient import TestClient as TestClient  # noqa
+2026-10-18 04:35:04,073 INFO     alphatrade.bootstrap: Ensured bootstrap admin admin@test.local
+2026-10-18 04:35:04,303 INFO     alphatrade.bootstrap: Ensured bootstrap viewer agaffoor68@gmail.com
+2026-10-18 04:35:14,498 INFO     alphatrade.angel.instruments: Angel instrument master synced: {'nse_cm': 10071, 
+'bse_cm': 13142, 'nse_fo': 38370, 'cde_fo': 10701, 'mcx_fo': 16018, 'bse_fo': 40797}
+2026-10-18 04:35:14,542 INFO     alphatrade.bootstrap: Instrument master bootstrap: ready
+2026-10-18 04:35:14,542 INFO     alphatrade.bootstrap: AlphaTradePro backend ready (env=test)
+2026-10-18 04:35:14,542 INFO     alphatrade: Environment: test
+2026-10-18 04:35:14,696 INFO     httpx: HTTP Request: GET http://testserver/api/v1/system/health "HTTP/1.1 200 OK"
+2026-10-18 04:35:14,698 INFO     httpx: HTTP Request: GET http://testserver/ "HTTP/1.1 200 OK"
+2026-10-18 04:35:14,698 INFO     httpx: HTTP Request: GET http://testserver/api/v1/portfolio "HTTP/1.1 401 
+Unauthorized"
+2026-10-18 04:35:14,921 INFO     httpx: HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 
+Unauthorized"
+2026-10-18 04:35:14,924 INFO     httpx: HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 
+Unauthorized"
+2026-10-18 04:35:15,014 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:15,148 INFO     httpx: HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 200 OK"
+2026-10-18 04:35:15,148 INFO     httpx: HTTP Request: GET http://testserver/api/v1/portfolio "HTTP/1.1 401 
+Unauthorized"
+2026-10-18 04:35:15,148 INFO     httpx: HTTP Request: GET http://testserver/api/v1/auth/me "HTTP/1.1 200 OK"
+2026-10-18 04:35:15,171 INFO     httpx: HTTP Request: GET http://testserver/api/v1/market/status "HTTP/1.1 200 OK"
+2026-10-18 04:35:15,290 INFO     httpx: HTTP Request: GET http://testserver/api/v1/market/search?q=RELIANCE "HTTP/1.1 
+200 OK"
+2026-10-18 04:35:17,253 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:21,443 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:21,443 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: 
+totp_login rejected: Consumer key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:21,675 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:23,868 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:28,049 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:28,049 INFO     httpx: HTTP Request: GET http://testserver/api/v1/portfolio "HTTP/1.1 400 Bad Request"
+2026-10-18 04:35:28,284 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:28,571 INFO     alphatrade.angel: Angel One session established for S53557129
+2026-10-18 04:35:30,466 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:34,669 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:34,669 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: 
+totp_login rejected: Consumer key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:36,869 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:39,122 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:43,288 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:43,288 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: 
+totp_login rejected: Consumer key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:47,531 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:49,687 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:53,959 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:35:53,959 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: 
+totp_login rejected: Consumer key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:36:02,210 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:36:04,449 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:36:08,613 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:36:08,613 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: 
+totp_login rejected: Consumer key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:36:24,829 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:36:27,043 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:36:31,273 WARNING  alphatrade.neo: Kotak login attempt 3 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:36:31,273 WARNING  alphatrade.feed: Market feed: Kotak Neo login failed for X7KT4 after 3 attempts: 
+totp_login rejected: Consumer key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:37:01,508 WARNING  alphatrade.neo: Kotak login attempt 1 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist
+2026-10-18 04:37:03,683 WARNING  alphatrade.neo: Kotak login attempt 2 for X7KT4 failed: totp_login rejected: Consumer 
+key 2304219e-1d0a-4fb0-8cf2-47e8ee1f7f0e does not exist

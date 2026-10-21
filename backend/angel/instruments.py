@@ -29,6 +29,7 @@ import requests
 
 from backend.core.config import settings
 from backend.core.database import app_cursor, meta_get, meta_set, now
+from backend.marketdata import search_index
 
 log = logging.getLogger("alphatrade.angel.instruments")
 
@@ -273,6 +274,9 @@ def sync(*, url: str | None = None, segments: Iterable[str] | None = None) -> di
 
         _state.update({"status": "ready", "last_sync": timestamp, "error": None, "counts": counts})
         log.info("Angel instrument master synced: %s", counts)
+        # The local search index mirrors this table; drop it so the next
+        # search rebuilds from the new master.
+        search_index.invalidate()
         return {"status": "ready", "synced_at": timestamp, "counts": counts, "total": sum(counts.values())}
 
 

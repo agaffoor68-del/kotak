@@ -12,7 +12,9 @@ session pool out of the route bodies.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -27,10 +29,13 @@ from backend.angel.quotes import QuoteError as AngelQuoteError
 from backend.angel.quotes import fetch as angel_fetch
 from backend.api.deps import CurrentUser, angel_call, current_user, require_admin
 from backend.core.config import settings
-from backend.marketdata import market_hours, master, ticks
+from backend.core.database import app_cursor, now
+from backend.marketdata import market_hours, master, search_index, ticks
 from backend.marketdata.quotes import quote_engine
 
 router = APIRouter(prefix="/api/v1/market", tags=["market"])
+
+log = logging.getLogger("alphatrade.api.market")
 
 #: Intervals the candle endpoint accepts (Angel's historical vocabulary).
 SUPPORTED_INTERVALS = list(ticks.INTERVAL_SECONDS)
@@ -50,6 +55,7 @@ def status_route(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
         "feed": angel_feed.health(),
         "scrip_master": master.status(),
         "angel_instruments": angel_instruments.status(),
+        "search_index": search_index.status(),
         "quotes_cache": quote_engine.health(),
         "record_ticks": settings.record_ticks,
         "intervals": SUPPORTED_INTERVALS,
@@ -60,18 +66,58 @@ def status_route(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
 @router.get("/search")
 def search_instruments(
     q: str = Query(min_length=1, max_length=40),
-    limit: int = Query(default=25, ge=1, le=100),
+    limit: int = Query(default=10, ge=1, le=50),
     exchange_segment: str | None = None,
+    scope: str = Query(
+        default="equity",
+        description="'equity' searches the in-memory index of NSE/BSE cash instruments; "
+        "'all' searches every segment, derivatives included",
+    ),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
-    """Search any NSE/BSE stock, index, future or option contract."""
+    """Search the local instrument master by symbol or company name.
+
+    The master is Angel One's scrip master, loaded into a local index: this
+    never calls the broker and never scans the table, so the dropdown stays
+    instant while the operator types. Every result carries the `token` the
+    rest of the platform quotes by.
+    """
+    _require_master()
+    if scope.strip().lower() == "all" and not exchange_segment:
+        results = search_index.search_all(q, limit=limit)
+    else:
+        results = search_index.search(q, limit=limit, exchange_segment=exchange_segment)
+    return {"query": q, "count": len(results), "results": results}
+
+
+def _require_master() -> None:
+    """Refuse to answer from an empty master instead of saying "no matches"."""
     if not master.status()["instruments"]:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "The instrument master is empty. Sync the Angel One instrument master first.",
         )
-    results = master.search(q, limit=limit, exchange_segment=exchange_segment)
-    return {"query": q, "count": len(results), "results": results}
+
+
+@router.get("/resolve")
+def resolve_symbol(
+    symbol: str = Query(min_length=1, max_length=64),
+    exchange_segment: str | None = None,
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Turn a symbol the user typed into the instrument that carries the token.
+
+    This is the conversion the platform depends on: "SBIN" becomes the Angel
+    One symbol token and the exchange segment it must be quoted with.
+    """
+    _require_master()
+    match = search_index.resolve(symbol, exchange_segment=exchange_segment)
+    if match is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"No instrument matches '{symbol}'. Search for it first.",
+        )
+    return match
 
 
 @router.get("/instruments/{token}")
@@ -98,6 +144,75 @@ def list_indices(user: CurrentUser = Depends(current_user)) -> list[dict[str, An
     return result
 
 
+@router.get("/quote/{token}")
+def get_quote(
+    token: str,
+    exchange_segment: str | None = Query(default=None),
+    refresh: bool = Query(default=False, description="Bypass the quote cache and call Angel One"),
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """The live quote for one instrument, by Angel One symbol token.
+
+    The token is looked up in the local master to work out the exchange
+    (NSE or BSE) it must be requested with, then Angel One's market-data
+    endpoint answers with the LTP, the day's OHLC and the volume.
+
+    A quote that is already in the cache and still fresh is returned as-is —
+    the feed keeps it current, and SmartAPI only allows one request a second.
+    Pass ``refresh=true`` to force a broker round trip.
+    """
+    instrument = search_index.find_instrument(token, exchange_segment)
+    if instrument is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"No instrument '{token}' in the master. Search for the symbol first.",
+        )
+    segment = str(instrument.get("exchange_segment") or "nse_cm")
+    exchange = angel_instruments.SEGMENT_EXCHANGE.get(segment, "NSE")
+
+    cached = quote_engine.cached(token, segment)
+    if cached is not None and not refresh and not cached.is_stale:
+        return {
+            "token": str(token),
+            "exchange_segment": segment,
+            "exchange": exchange,
+            "symbol": instrument.get("symbol"),
+            "name": instrument.get("name"),
+            "source": "cache",
+            "cached": True,
+            "quote": cached.to_dict(),
+        }
+
+    call = angel_call(user)
+    try:
+        quotes = angel_fetch(call, [(str(token), segment)], "all")
+    except AngelQuoteError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
+    except Exception as error:  # noqa: BLE001 - the UI must get one clear message
+        log.warning("Quote fetch failed for %s: %s", token, error)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Could not fetch the quote for {token}.") from error
+
+    if not quotes:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            f"Angel One returned no quote for {token} on {exchange}.",
+        )
+    quote = quotes[0]
+    quote_engine.store(quote)
+    ticks.record_quote(quote)
+    ticks.flush()
+    return {
+        "token": str(token),
+        "exchange_segment": segment,
+        "exchange": exchange,
+        "symbol": instrument.get("symbol"),
+        "name": instrument.get("name"),
+        "source": "angel_one",
+        "cached": False,
+        "quote": quote.to_dict(),
+    }
+
+
 @router.get("/underlyings")
 def list_underlyings(
     exchange_segment: str = Query(default="nse_fo"),
@@ -110,8 +225,118 @@ def list_underlyings(
 def list_futures(
     exchange_segment: str = Query(default="nse_fo"),
     user: CurrentUser = Depends(current_user),
-) -> list[dict[str, Any]]:
+) -> list[str]:
     return master.futures(exchange_segment)
+
+
+# ------------------------------------------------------------------ watchlist
+
+
+class WatchlistItem(BaseModel):
+    """One instrument on the user's watchlist."""
+
+    token: str = Field(min_length=1, max_length=32)
+    symbol: str = Field(default="", max_length=64)
+    exchange_segment: str | None = Field(default=None, max_length=16)
+
+
+class WatchlistRequest(BaseModel):
+    """Add one or more instruments to the watchlist."""
+
+    items: list[WatchlistItem] = Field(default_factory=list, max_length=50)
+
+
+def _watchlist_rows(user_id: str) -> list[dict[str, Any]]:
+    with app_cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT token, exchange_segment, symbol, name, position, created_at
+            FROM watchlist WHERE user_id = ?
+            ORDER BY position ASC, created_at ASC
+            """,
+            (user_id,),
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+@router.get("/watchlist")
+def get_watchlist(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    """The user's watchlist, as instrument tokens the backend can quote."""
+    rows = _watchlist_rows(user.id)
+    return {"items": rows, "count": len(rows)}
+
+
+@router.post("/watchlist")
+def add_to_watchlist(
+    payload: WatchlistRequest,
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Add instruments to the watchlist.
+
+    The token is resolved against the local master, so the symbol and the
+    exchange segment are always the ones the broker expects. Adding the same
+    instrument twice is a no-op rather than an error.
+    """
+    if not payload.items:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Provide at least one instrument")
+
+    resolved: list[dict[str, Any]] = []
+    for item in payload.items:
+        instrument = search_index.find_instrument(item.token, item.exchange_segment)
+        if instrument is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                f"Unknown instrument token '{item.token}'. Search for the symbol first.",
+            )
+        resolved.append({
+            "token": str(instrument["token"]),
+            "exchange_segment": str(instrument.get("exchange_segment") or "nse_cm"),
+            "symbol": str(instrument.get("symbol") or item.symbol or instrument["token"]),
+            "name": instrument.get("name"),
+        })
+
+    with app_cursor() as cursor:
+        for entry in resolved:
+            cursor.execute(
+                """
+                INSERT INTO watchlist (id, user_id, token, exchange_segment, symbol, name, position, created_at)
+                VALUES (?,?,?,?,?,?,(SELECT COALESCE(MAX(position), -1) + 1 FROM watchlist WHERE user_id = ?),?)
+                ON CONFLICT(user_id, token, exchange_segment) DO UPDATE SET
+                    symbol = excluded.symbol, name = excluded.name
+                """,
+                (
+                    uuid.uuid4().hex, user.id, entry["token"], entry["exchange_segment"],
+                    entry["symbol"], entry["name"], user.id, now(),
+                ),
+            )
+
+    rows = _watchlist_rows(user.id)
+    return {"status": "ok", "count": len(rows), "items": rows}
+
+
+@router.delete("/watchlist/{token}")
+def remove_from_watchlist(
+    token: str,
+    exchange_segment: str | None = Query(default=None),
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Remove an instrument from the watchlist."""
+    with app_cursor() as cursor:
+        if exchange_segment:
+            cursor.execute(
+                "DELETE FROM watchlist WHERE user_id = ? AND token = ? AND exchange_segment = ?",
+                (user.id, str(token), exchange_segment),
+            )
+        else:
+            cursor.execute(
+                "DELETE FROM watchlist WHERE user_id = ? AND token = ?",
+                (user.id, str(token)),
+            )
+        removed = cursor.rowcount
+
+    rows = _watchlist_rows(user.id)
+    return {"status": "ok", "removed": removed, "count": len(rows), "items": rows}
+
 
 
 class HistoryDownloadRequest(BaseModel):

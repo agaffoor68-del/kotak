@@ -232,6 +232,18 @@ export interface Instrument {
   tick_size?: number;
   is_index: number;
   quote?: Quote | null;
+  /** The other exchanges the same symbol trades on. */
+  listings?: { token: string; exchange_segment: string }[];
+}
+
+/** One row of the user's watchlist. */
+export interface WatchlistItem {
+  token: string;
+  exchange_segment: string;
+  symbol: string;
+  name?: string | null;
+  position?: number;
+  created_at?: number;
 }
 
 export interface Candle {
@@ -525,9 +537,42 @@ export const api = {
 
   // market
   status: () => get<MarketStatus>("/api/v1/market/status"),
-  search: (q: string, limit = 25) =>
+  search: (q: string, limit = 25, scope: "equity" | "all" = "equity") =>
+    get<{ query: string; count: number; results: Instrument[] }>(
+      `/api/v1/market/search?q=${encodeURIComponent(q)}&limit=${limit}&scope=${scope}`,
+    ),
+  /** The local symbol master: instant, and never calls the broker. */
+  searchInstruments: (q: string, limit = 10) =>
     get<{ query: string; count: number; results: Instrument[] }>(
       `/api/v1/market/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+    ),
+  /** Turn a symbol the user typed into the instrument that carries the token. */
+  resolveInstrument: (symbol: string) =>
+    get<Instrument>(`/api/v1/market/resolve?symbol=${encodeURIComponent(symbol)}`),
+  /** The live quote for one instrument, by symbol token. */
+  quote: (token: string, exchangeSegment?: string, refresh = false) => {
+    const params = new URLSearchParams();
+    if (exchangeSegment) params.set("exchange_segment", exchangeSegment);
+    if (refresh) params.set("refresh", "true");
+    const query = params.toString();
+    return get<{
+      token: string;
+      exchange_segment: string;
+      exchange: string;
+      symbol?: string;
+      name?: string;
+      source: string;
+      cached: boolean;
+      quote: Quote;
+    }>(`/api/v1/market/quote/${encodeURIComponent(token)}${query ? `?${query}` : ""}`);
+  },
+  watchlist: () => get<{ items: WatchlistItem[]; count: number }>("/api/v1/market/watchlist"),
+  addToWatchlist: (items: { token: string; symbol?: string; exchange_segment?: string }[]) =>
+    post<{ status: string; count: number; items: WatchlistItem[] }>("/api/v1/market/watchlist", { items }),
+  removeFromWatchlist: (token: string, exchangeSegment?: string) =>
+    del<{ status: string; removed: number; count: number; items: WatchlistItem[] }>(
+      `/api/v1/market/watchlist/${encodeURIComponent(token)}` +
+        (exchangeSegment ? `?exchange_segment=${encodeURIComponent(exchangeSegment)}` : ""),
     ),
   indices: () => get<(Instrument & { quote?: Quote | null })[]>("/api/v1/market/indices"),
   underlyings: () => get<string[]>("/api/v1/market/underlyings"),

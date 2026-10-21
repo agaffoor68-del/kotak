@@ -170,6 +170,21 @@ def seed_instrument_master() -> None:
         log.warning("Could not bootstrap the Angel One instrument master: %s", error)
 
 
+def warm_search_index() -> None:
+    """Build the local instrument search index so the first keystroke is fast.
+
+    The index mirrors the instrument master in memory. Building it here means
+    the search dropdown is instant from the first character instead of paying
+    the build cost on the operator's first search.
+    """
+    from backend.marketdata import search_index
+    try:
+        count = search_index.refresh()
+        log.info("Instrument search index warmed: %d instruments", count)
+    except Exception as error:  # noqa: BLE001 - a warm-up must never break boot
+        log.warning("Could not build the instrument search index: %s", error)
+
+
 def startup() -> None:
     """Full boot sequence. Safe to call more than once."""
     configure_logging()
@@ -209,6 +224,7 @@ def startup() -> None:
     seed_risk_defaults()
     seed_strategy_templates()
     seed_instrument_master()
+    warm_search_index()
 
     os.makedirs(settings.data_dir, exist_ok=True)
     log.info("AlphaTradePro backend ready (env=%s)", settings.environment)

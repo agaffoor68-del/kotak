@@ -187,9 +187,25 @@ CREATE TABLE IF NOT EXISTS instruments (
     PRIMARY KEY (token, exchange_segment)
 );
 CREATE INDEX IF NOT EXISTS idx_instruments_symbol ON instruments(symbol);
+CREATE INDEX IF NOT EXISTS idx_instruments_trading_symbol ON instruments(trading_symbol);
+CREATE INDEX IF NOT EXISTS idx_instruments_name ON instruments(name);
 CREATE INDEX IF NOT EXISTS idx_instruments_underlying ON instruments(underlying);
 CREATE INDEX IF NOT EXISTS idx_instruments_expiry ON instruments(exchange_segment, expiry);
 CREATE INDEX IF NOT EXISTS idx_instruments_source ON instruments(source);
+CREATE INDEX IF NOT EXISTS idx_instruments_segment_symbol ON instruments(exchange_segment, symbol);
+
+CREATE TABLE IF NOT EXISTS watchlist (
+    id               TEXT PRIMARY KEY,
+    user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token            TEXT NOT NULL,
+    exchange_segment TEXT NOT NULL,
+    symbol           TEXT NOT NULL,
+    name             TEXT,
+    position         INTEGER NOT NULL DEFAULT 0,
+    created_at       REAL NOT NULL,
+    UNIQUE (user_id, token, exchange_segment)
+);
+CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id, position, created_at);
 
 CREATE TABLE IF NOT EXISTS strategies (
     id          TEXT PRIMARY KEY,

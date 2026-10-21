@@ -79,7 +79,11 @@ function BacktestLab() {
       return;
     }
     const timer = window.setTimeout(() => {
-      api.search(query, 20).then((response) => setInstruments(response.results)).catch(() => setInstruments([]));
+      // The backtester can run on any instrument, derivatives included.
+      api
+        .search(query, 20, "all")
+        .then((response) => setInstruments(response.results))
+        .catch(() => setInstruments([]));
     }, 250);
     return () => window.clearTimeout(timer);
   }, [instrumentQuery]);

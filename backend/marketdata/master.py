@@ -19,6 +19,7 @@ import requests
 
 from backend.core.config import settings
 from backend.core.database import app_cursor, meta_get, meta_set, now
+from backend.marketdata import search_index
 
 log = logging.getLogger("alphatrade.master")
 
@@ -196,6 +197,9 @@ def sync(session_call, *, segments: Iterable[str] = SEGMENTS) -> dict[str, Any]:
             return {"status": "failed", "error": "; ".join(errors), "counts": counts}
 
         _state.update({"status": "ready", "last_sync": timestamp, "error": None, "counts": counts})
+        # The local search index mirrors this table; drop it so the next
+        # search rebuilds from the new master.
+        search_index.invalidate()
         return {"status": "ready", "synced_at": timestamp, "counts": counts, "warnings": errors}
 
 
