@@ -32,6 +32,8 @@ class BreadthData(StrictModel):
 
 class MoverData(StrictModel):
     token: str
+    symbol: str
+    name: str | None = None
     exchange_segment: str
     last: float | None = None
     change_percent: float | None = None
@@ -71,8 +73,13 @@ class OptionChain(StrictModel):
 
 
 def quote_to_mover(quote: Any) -> MoverData:
+    from backend.marketdata.master import instrument_display
+
     data = quote.to_dict() if hasattr(quote, "to_dict") else quote
+    token = str(data.get("token", ""))
+    exchange_segment = str(data.get("exchange_segment", ""))
+    symbol, name = instrument_display(token, exchange_segment)
     return MoverData(
-        token=str(data.get("token", "")), exchange_segment=str(data.get("exchange_segment", "")),
+        token=token, symbol=symbol, name=name, exchange_segment=exchange_segment,
         last=data.get("last"), change_percent=data.get("change_percent"), volume=data.get("volume"),
     )

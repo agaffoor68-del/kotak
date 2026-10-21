@@ -8,7 +8,7 @@ import time
 from typing import Any, Callable
 
 from backend.core.config import settings
-from backend.marketdata import market_hours
+from backend.marketdata import market_hours, master
 
 from . import instruments
 from .quotes import fetch
@@ -55,6 +55,16 @@ class MarketBreadthWorker:
             return None
         # LTP mode does not include previous close; OHLC is required for A/D.
         quotes = fetch(call, [(row["token"], row["exchange_segment"]) for row in universe], "ohlc")
+        def with_symbols(items):
+            return [
+                {
+                    **item.to_dict(),
+                    "symbol": master.instrument_display(item.token, item.exchange_segment)[0],
+                    "name": master.instrument_display(item.token, item.exchange_segment)[1],
+                }
+                for item in items
+            ]
+
         snapshot = {
             "as_of": time.time(),
             "source": "angel_one",
@@ -63,8 +73,8 @@ class MarketBreadthWorker:
             # Always publish a complete numeric breadth object so clients never
             # have to infer whether zero means "no data" or "no movers".
             "breadth": {"advances": 0, "declines": 0, "unchanged": 0, "priced": 0, **(market_hours.breadth(quotes) or {})},
-            "top_gainers": market_hours.rank(quotes, limit=10, reverse=True),
-            "top_losers": market_hours.rank(quotes, limit=10, reverse=False),
+            "top_gainers": with_symbols(market_hours.rank(quotes, limit=10, reverse=True)),
+            "top_losers": with_symbols(market_hours.rank(quotes, limit=10, reverse=False)),
             "most_active": market_hours.most_active(quotes, limit=10),
         }
         with self._lock:
