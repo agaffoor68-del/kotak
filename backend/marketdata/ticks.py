@@ -265,7 +265,7 @@ def history(token: str, exchange_segment: str, interval: str, limit: int = 500) 
 
 def stored_history(
     token: str,
-    exchange_segment: str,
+    exchange_segment: str | None,
     interval: str,
     limit: int = 5000,
     start_ts: float | None = None,
@@ -276,6 +276,10 @@ def stored_history(
     This deliberately does not replace :func:`history`: the latter is the
     live-tape view built from ticks.  Backtests need the durable candle store,
     whose rows may predate the process starting.
+
+    `exchange_segment` may be ``None`` to read the token's bars from every
+    segment: the downloader files them under the segment it resolved, which is
+    not always the one the query asks for.
     """
     if interval not in INTERVAL_SECONDS:
         raise ValueError(f"Unsupported interval {interval!r}; expected one of {sorted(INTERVAL_SECONDS)}")
@@ -286,13 +290,13 @@ def stored_history(
             """
             SELECT bucket, open, high, low, close, volume, trades
             FROM candles
-            WHERE token = ? AND exchange_segment = ? AND interval = ?
+            WHERE token = ? AND (? IS NULL OR exchange_segment = ?) AND interval = ?
               AND (? IS NULL OR bucket * ? >= ?)
               AND (? IS NULL OR bucket * ? <= ?)
             ORDER BY bucket DESC
             LIMIT ?
             """
-            , (str(token), exchange_segment, interval, start_ts, seconds, start_ts,
+            , (str(token), exchange_segment, exchange_segment, interval, start_ts, seconds, start_ts,
                end_ts, seconds, end_ts, capped_limit),
         )
         rows = cursor.fetchall()

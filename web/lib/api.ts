@@ -315,6 +315,25 @@ export interface OptionLeg {
   gamma?: number | null;
 }
 
+export interface BreadthSnapshot {
+  as_of?: number;
+  universe_size: number;
+  priced: number;
+  breadth: {
+    priced?: number | null;
+    advances?: number | null;
+    declines?: number | null;
+    unchanged?: number | null;
+    limit_up?: number | null;
+    limit_down?: number | null;
+    advance_decline_ratio?: number | null;
+    volume_ratio?: number | null;
+  };
+  top_gainers: Quote[];
+  top_losers: Quote[];
+  most_active: Quote[];
+}
+
 export interface Coverage {
   ticks: number;
   first_tick: number | null;
@@ -585,14 +604,7 @@ export const api = {
       quote_type: quoteType,
     }),
   breadth: (limit = 200) =>
-    get<{
-      universe_size: number;
-      priced: number;
-      breadth: Record<string, number | null>;
-      top_gainers: Quote[];
-      top_losers: Quote[];
-      most_active: Quote[];
-    }>(`/api/v1/market/breadth?limit=${limit}`),
+    get<BreadthSnapshot>(`/api/v1/market/breadth?limit=${limit}`),
   candles: (token: string, exchangeSegment: string, interval: string, limit = 400, days?: number) =>
     get<{ candles: Candle[]; count: number; cached: boolean; coverage: Coverage }>(
       `/api/v1/market/candles/${encodeURIComponent(token)}?exchange_segment=${exchangeSegment}&interval=${interval}&limit=${limit}${

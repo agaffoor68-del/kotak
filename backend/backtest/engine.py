@@ -53,10 +53,8 @@ DEFAULT_STRATEGY_PARAMS: dict[str, Any] = {
     "side": "long",          # the platform models the long side
 }
 
-NO_DATA_ERROR = (
-    "No historical data found in DB for this symbol. "
-    "Please run the Historical Loader first."
-)
+#: The message a backtest shows when the token has no bars in the database.
+NO_DATA_ERROR = "No data in DB for token {token}. Run the downloader first."
 
 
 class BacktestError(ValueError):
@@ -658,6 +656,7 @@ def load_candles(
         }
         for row in rows
     ]
+    log.info(f"Backtest query returned {len(candles)} rows for token {token}")
     return candles, instrument
 
 
@@ -691,10 +690,7 @@ def data_exists(
     window_text = f"{from_date} to {to_date}"
     stored = stored_range(str(symbol), timeframe)
     if not stored["bars"]:
-        return False, instrument, (
-            f"{NO_DATA_ERROR} Nothing is stored for token '{symbol}' at {timeframe}. "
-            "Download the historical data first."
-        )
+        return False, instrument, NO_DATA_ERROR.format(token=symbol)
     return False, instrument, (
         f"No historical data found in DB for {symbol} between {window_text} (IST). "
         f"Stored: {stored['bars']} bars from {ist_stamp(stored['first_bar'])} "

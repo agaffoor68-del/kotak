@@ -451,7 +451,14 @@ def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)
     for item in universe:
         token = str(item["token"])
         segment = item.get("exchange_segment", "nse_cm")
+        # The token is the key: the rows are stored under exactly the token the
+        # downloader was given, so the query reads them under the same string.
         candles = ticks.stored_history(token, segment, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
+        if not candles:
+            # The download may have filed the bars under another exchange
+            # segment. The token still identifies them.
+            candles = ticks.stored_history(token, None, interval, limit=50000, start_ts=start_ts, end_ts=end_ts)
+        log.info(f"Backtest query returned {len(candles)} rows for token {token}")
         instrument = master.get_instrument(token, segment)
         label = (item.get("label") or (instrument or {}).get("name") or token)
         candles_by_symbol[label] = candles
@@ -467,7 +474,7 @@ def backtest(payload: BacktestRequest, user: CurrentUser = Depends(current_user)
                 f"{ist_stamp(stored['first_bar'])} to {ist_stamp(stored['last_bar'])}."
             )
         else:
-            error = f"No historical data found for {label}. Please download data first."
+            error = f"No data in DB for token {requested}. Run the downloader first."
         return {"status": "no_data", "error": error, "note": "", "metrics": {}, "trades": [], "equity_curve": [], "drawdown_curve": [], "bars": 0, "warnings": [], "coverage": coverage, "interval": interval}
 
     result = engine.run(

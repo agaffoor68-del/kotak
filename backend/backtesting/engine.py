@@ -150,6 +150,10 @@ def load_history(
     enforced.
     """
     stored = ticks.stored_history(token, exchange_segment, interval, limit)
+    if not stored:
+        # The token is the key: the rows may have been filed under another
+        # exchange segment than the one asked for.
+        stored = ticks.stored_history(token, None, interval, limit)
     if stored:
         return stored
     start, end = (start_date, end_date) if start_date and end_date else default_backtest_window(interval)

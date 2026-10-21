@@ -81,13 +81,66 @@ def search_instruments(
     never calls the broker and never scans the table, so the dropdown stays
     instant while the operator types. Every result carries the `token` the
     rest of the platform quotes by.
+
+    An empty result usually means the master is stale rather than that the
+    symbol does not exist, so the master is refreshed once and the search is
+    repeated before the answer is returned.
     """
+    if not master.status()["instruments"]:
+        # An empty master is the one case the search can fix itself: the
+        # Angel One JSON master is public, so it needs no broker session.
+        _refresh_master()
     _require_master()
-    if scope.strip().lower() == "all" and not exchange_segment:
-        results = search_index.search_all(q, limit=limit)
-    else:
-        results = search_index.search(q, limit=limit, exchange_segment=exchange_segment)
-    return {"query": q, "count": len(results), "results": results}
+    results, refreshed = _search(q, limit=limit, exchange_segment=exchange_segment, scope=scope)
+    return {
+        "query": q,
+        "count": len(results),
+        "results": results,
+        "master_refreshed": refreshed,
+    }
+
+
+def _search(
+    query: str,
+    *,
+    limit: int,
+    exchange_segment: str | None,
+    scope: str,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Search the local master, refreshing it once when nothing matches."""
+    def run() -> list[dict[str, Any]]:
+        if scope.strip().lower() == "all" and not exchange_segment:
+            return search_index.search_all(query, limit=limit)
+        return search_index.search(query, limit=limit, exchange_segment=exchange_segment)
+
+    results = run()
+    if results:
+        return results, False
+
+    # Nothing matched: the master is probably empty or out of date. Refresh it
+    # (Angel One's JSON master is public, so no broker session is needed) and
+    # look once more before telling the operator the symbol does not exist.
+    if not _refresh_master():
+        return results, False
+    try:
+        search_index.refresh()
+    except Exception:  # noqa: BLE001 - the index rebuild must not fail the search
+        log.exception("Instrument search index rebuild failed after a master sync")
+    return run(), True
+
+
+def _refresh_master() -> bool:
+    """Sync the Angel One instrument master. Returns True when it succeeded."""
+    try:
+        result = master.sync_angel()
+    except Exception:  # noqa: BLE001 - the search must survive a failed sync
+        log.exception("Instrument master refresh failed")
+        return False
+    if result.get("status") != "ready":
+        log.warning("Instrument master refresh did not complete: %s", result.get("error"))
+        return False
+    log.info("Instrument master refreshed after an empty search: %s", result.get("counts"))
+    return True
 
 
 def _require_master() -> None:
