@@ -8,7 +8,7 @@ services:
     dockerContext: .
     plan: starter # free sleeps -> kills keepalive/feed; starter keeps it alive
     autoDeploy: true
-    healthCheckPath: /api/v1/system/health
+    healthCheckPath: /health
     disk:
       name: market-data
       mountPath: /app/var
@@ -76,7 +76,7 @@ services:
       - key: RECORD_TICKS
         value: 1
       - key: ALLOWED_ORIGINS
-        sync: false # e.g. https://your-frontend.vercel.app
+        value: "*" # any origin; set a comma-separated list to lock it down
       - key: FRONTEND_URL
         sync: false
       - key: PUBLIC_URL

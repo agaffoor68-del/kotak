@@ -9,6 +9,18 @@ const DEFAULT_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000"
 let base = DEFAULT_BASE;
 let accessToken: string | null = null;
 
+/**
+ * The deployed API hosts, tried in order when nothing is configured.
+ *
+ * A free-tier Render instance sleeps after a few minutes of inactivity and
+ * takes up to a minute to wake, so the list ends with the known deployment
+ * rather than the local development port.
+ */
+const KNOWN_BACKENDS = [
+  "https://kotak-xs4d.onrender.com",
+  "http://127.0.0.1:8000",
+];
+
 export function setApiBase(next: string) {
   base = next.replace(/\/+$/, "");
 }
@@ -42,23 +54,35 @@ export async function ensureApiBase(): Promise<string> {
   if (resolvedBase) return resolvedBase;
   if (typeof window === "undefined") return base;
 
-  const candidates = [base];
+  const candidates: string[] = [];
+  const configured = window.localStorage.getItem("alphatrade.api-base");
+  if (configured) {
+    setApiBase(configured);
+    return base;
+  }
   // A same-origin deployment needs no probing; only try it when the configured
   // base actually points somewhere else.
   if (!base.startsWith(window.location.origin)) {
-    candidates.unshift(window.location.origin);
+    candidates.push(window.location.origin);
+  }
+  if (base && !candidates.includes(base)) candidates.push(base);
+  for (const known of KNOWN_BACKENDS) {
+    if (!candidates.includes(known)) candidates.push(known);
   }
 
+  const tried: string[] = [];
   for (const candidate of candidates) {
+    tried.push(candidate);
     try {
-      // A same-origin probe answers in milliseconds; the cross-origin backend may
+      // `/health` is deliberately dependency-free: it answers in milliseconds
+      // even while the broker sessions are down. The cross-origin backend may
       // be a free-tier host that is asleep and needs 15-50s to wake, so the
       // budget here is deliberately generous. `request()` below uses a plain
       // fetch with no timeout, so once this probe succeeds the real calls ride
       // the now-warm instance.
-      const response = await fetch(`${candidate}/api/v1/system/health`, {
+      const response = await fetch(`${candidate}/health`, {
         cache: "no-store",
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(60000),
       });
       if (response.ok) {
         resolvedBase = candidate;
@@ -73,6 +97,7 @@ export async function ensureApiBase(): Promise<string> {
   // Nothing answered; keep the configured default so the error is a real
   // "cannot reach the backend" rather than a silent redirect.
   resolvedBase = base;
+  tried.push(base);
   return base;
 }
 
@@ -127,7 +152,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // and it reports all of them as a bare "Failed to fetch". Say which host was
     // tried so the cause is obvious instead of a dead end.
     throw new ApiError(
-      `Cannot reach the backend at ${base}. Check that it is running and that this page's origin is allowed by ALLOWED_ORIGINS.`,
+      `Cannot reach the backend at ${base}. Check that it is running and that this page's origin is allowed by the API's CORS settings.`,
       0,
     );
   }
@@ -299,11 +324,18 @@ export interface MarketStatus {
   };
   intervals: string[];
   record_ticks: boolean;
+  features?: {
+    live_trading?: boolean;
+    paper_trading?: boolean;
+    backtest?: boolean;
+    algo_execution?: boolean;
+  };
 }
 
 export interface OptionLeg {
   token?: string;
   trading_symbol?: string;
+  lot_size?: number | null;
   ltp: number | null;
   open_interest: number | null;
   volume: number | null;
@@ -391,6 +423,17 @@ export interface BacktestResult {
   warnings: string[];
   error: string | null;
   coverage?: { label: string; bars: number }[];
+}
+
+/** What the automatic history step did during a one-click backtest. */
+export interface BacktestDownload {
+  attempted: boolean;
+  performed: boolean;
+  bars: number;
+  source: string | null;
+  error: string | null;
+  seconds: number;
+  yf_ticker?: string;
 }
 
 export interface CoachFinding {
@@ -618,8 +661,16 @@ export const api = {
     ),
 
   // options
-  chain: (underlying: string) =>
-    get<OptionChain>(`/api/v1/options/chain?underlying=${encodeURIComponent(underlying)}`),
+  chain: (underlying: string, expiry?: string) =>
+    get<OptionChain>(
+      `/api/v1/options/chain?underlying=${encodeURIComponent(underlying)}${
+        expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""
+      }`,
+    ),
+  optionExpiries: (underlying: string) =>
+    get<{ underlying: string; expiries: string[]; near: string | null; count: number }>(
+      `/api/v1/options/expiries?underlying=${encodeURIComponent(underlying)}`,
+    ),
 
   // strategies
   indicators: () => get<IndicatorCatalog>("/api/v1/strategies/indicators"),
@@ -671,18 +722,38 @@ export const api = {
     start_date?: string;
     end_date?: string;
   }) => post<BacktestResult>("/api/v1/strategies/backtest", body),
+  /**
+   * The one-click pipeline: resolve the symbol, download whatever history is
+   * missing, and run the simulation — all in one request.
+   */
+  runBacktest: (body: {
+    strategy_id?: string;
+    definition?: unknown;
+    symbol?: string;
+    symbol_token?: string;
+    exchange_segment?: string;
+    initial_capital?: number;
+    slippage?: string;
+    timeframe?: string;
+    start_date?: string;
+    end_date?: string;
+    history_days?: number;
+    auto_download?: boolean;
+  }) => post<BacktestResult & { download?: BacktestDownload; symbol?: string }>("/api/v1/backtest/run", body),
 
   // execution
   portfolio: (broker?: ExecutionBroker) =>
     get<Record<string, unknown>>(`/api/v1/portfolio${broker ? `?broker=${broker}` : ""}`),
   executionBrokers: () => get<ExecutionBrokersResponse>("/api/v1/execution/brokers"),
-  charges: (exchangeSegment: string, product: string, quantity: number, price: number) =>
+  charges: (exchangeSegment: string, product: string, quantity: number, price: number, isOption = false) =>
     get<{
       buy: Record<string, number>;
       sell: Record<string, number>;
       round_trip: number;
       break_even_move_percent: number | null;
-    }>(`/api/v1/charges?exchange_segment=${exchangeSegment}&product=${product}&quantity=${quantity}&price=${price}`),
+    }>(
+      `/api/v1/charges?exchange_segment=${exchangeSegment}&product=${product}&quantity=${quantity}&price=${price}&is_option=${isOption}`,
+    ),
   liveOrder: (order: Record<string, unknown>) => post<Record<string, unknown>>("/api/v1/orders/live", order),
   cancelOrder: (orderId: string, broker?: ExecutionBroker) =>
     post<Record<string, unknown>>("/api/v1/orders/cancel", {

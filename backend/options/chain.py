@@ -257,8 +257,10 @@ def build_chain(
         row: dict[str, Any] = {
             "strike": strike,
             "expiry": expiry,
+            "lot_size": entry.get("lot_size"),
             "call": {
                 "token": call_token, "trading_symbol": (entry.get("call") or {}).get("trading_symbol"),
+                "lot_size": entry.get("lot_size"),
                 "ltp": call_ltp, "open_interest": call_oi, "volume": call_quote.volume if call_quote else None,
                 "change_percent": call_quote.change_percent if call_quote else None,
                 "bid": call_quote.bid if call_quote else None, "ask": call_quote.ask if call_quote else None,
@@ -266,6 +268,7 @@ def build_chain(
             },
             "put": {
                 "token": put_token, "trading_symbol": (entry.get("put") or {}).get("trading_symbol"),
+                "lot_size": entry.get("lot_size"),
                 "ltp": put_ltp, "open_interest": put_oi, "volume": put_quote.volume if put_quote else None,
                 "change_percent": put_quote.change_percent if put_quote else None,
                 "bid": put_quote.bid if put_quote else None, "ask": put_quote.ask if put_quote else None,

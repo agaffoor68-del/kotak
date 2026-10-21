@@ -19,6 +19,8 @@ interface InstrumentSearchProps {
   placeholder?: string;
   disabled?: boolean;
   label?: string;
+  /** "equity" searches cash instruments; "all" also searches derivatives. */
+  scope?: "equity" | "all";
 }
 
 /** The name is only worth showing when it says more than the symbol does. */
@@ -34,6 +36,7 @@ export function InstrumentSearch({
   placeholder = "Search a symbol, e.g. SBIN or RELIANCE",
   disabled = false,
   label = "Search",
+  scope = "equity",
 }: InstrumentSearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Instrument[]>([]);
@@ -57,7 +60,7 @@ export function InstrumentSearch({
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await api.searchInstruments(term, 10);
+        const response = await api.search(term, 10, scope);
         if (!activeRequest) return;
         setResults(response.results);
         setActive(0);
@@ -76,7 +79,7 @@ export function InstrumentSearch({
       activeRequest = false;
       window.clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, scope]);
 
   // Close the dropdown when the operator clicks away.
   useEffect(() => {
