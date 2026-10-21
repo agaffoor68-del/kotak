@@ -258,6 +258,14 @@ def get_instrument(token: str, exchange_segment: str) -> dict[str, Any] | None:
         return dict(row) if row else None
 
 
+def instrument_display(token: str, exchange_segment: str) -> tuple[str, str | None]:
+    """Return the display symbol and optional company name for a token."""
+    instrument = get_instrument(token, exchange_segment)
+    if instrument:
+        return str(instrument.get("symbol") or instrument.get("trading_symbol") or token), instrument.get("name")
+    return f"{token} (Unknown)", None
+
+
 def list_by_trading_symbol(trading_symbol: str, exchange_segment: str | None = None) -> list[dict[str, Any]]:
     sql = "SELECT * FROM instruments WHERE UPPER(trading_symbol) = UPPER(?)"
     params: list[Any] = [trading_symbol]

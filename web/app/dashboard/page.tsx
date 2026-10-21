@@ -311,7 +311,7 @@ function MoverList({ title, quotes, emptyText }: { title: string; quotes: Quote[
         <table className="tbl">
           <thead>
             <tr>
-              <th>Token</th>
+              <th>Symbol</th>
               <th>Last</th>
               <th>Change</th>
             </tr>
@@ -319,7 +319,7 @@ function MoverList({ title, quotes, emptyText }: { title: string; quotes: Quote[
           <tbody>
             {quotes.map((quote) => (
               <tr key={quoteKey(quote.token, quote.exchange_segment)}>
-                <td className="num text-ink-dim">{quote.token}</td>
+                <td className="num text-ink-dim" title={quote.name ?? undefined}>{quote.symbol ?? `${quote.token} (Unknown)`}</td>
                 <td className="num">{num(quote.last)}</td>
                 <td className={`num ${toneClass(quote.change_percent)}`}>{percent(quote.change_percent)}</td>
               </tr>
