@@ -1,9 +1,18 @@
-"""Symbol master synchronised from Kotak Neo.
+"""Symbol master synchronised from Kotak Neo and Angel One.
 
-The scrip master is a set of CSV files published by Kotak. We fetch the file
-list through the authenticated API, download each segment's CSV and normalise it
-into the `instruments` table. Nothing here invents an instrument: if a segment
-fails to download, the sync reports it and the previous master stays in place.
+The master has two sources, and both are needed:
+
+* **Kotak Neo** publishes a set of CSV files (one per exchange segment). We
+  fetch the file list through the authenticated API, download each segment's
+  CSV and normalise it into the `instruments` table.
+* **Angel One** publishes one public JSON file, ``OpenAPIScripMaster.json``,
+  which is the token namespace the SmartAPI quote endpoint understands. It is
+  synced by :func:`sync_angel` and is what the platform quotes by — a symbol
+  resolved against a Kotak token alone cannot be priced, which is why the
+  option chain and the quote endpoints used to come back empty.
+
+Nothing here invents an instrument: if a source fails to download, the sync
+reports it and the previous master stays in place.
 """
 
 from __future__ import annotations
@@ -24,6 +33,9 @@ from backend.marketdata import search_index
 log = logging.getLogger("alphatrade.master")
 
 SEGMENTS = ("nse_cm", "bse_cm", "nse_fo", "bse_fo", "cde_fo", "mcx_fo")
+
+#: The source name Angel One's rows carry in the `instruments` table.
+ANGEL_SOURCE = "angel"
 
 #: How often the master is refreshed. Kotak publishes new expiries daily.
 SYNC_INTERVAL_SECONDS = 6 * 60 * 60
@@ -71,6 +83,11 @@ def _normalise_expiry(raw: str) -> str | None:
 
 
 def _upsert(cursor, record: dict[str, Any]) -> None:
+    """Write one Kotak instrument.
+
+    A Kotak row never overwrites an Angel One row: both masters use the same
+    primary key, and Angel's row is the one the quote API understands.
+    """
     cursor.execute(
         """
         INSERT INTO instruments (token, exchange_segment, symbol, trading_symbol, name, series,
@@ -86,6 +103,7 @@ def _upsert(cursor, record: dict[str, Any]) -> None:
             precision=excluded.precision, instrument_type=excluded.instrument_type,
             underlying=excluded.underlying, multiplier=excluded.multiplier,
             is_index=excluded.is_index, updated_at=excluded.updated_at
+        WHERE instruments.source != 'angel'
         """,
         record,
     )
@@ -145,8 +163,38 @@ def fetch_segment_files(call) -> dict[str, str]:
     return mapping
 
 
-def sync(session_call, *, segments: Iterable[str] = SEGMENTS) -> dict[str, Any]:
-    """Download and persist the scrip master for the requested segments."""
+def sync_angel(*, url: str | None = None) -> dict[str, Any]:
+    """Sync Angel One's ``OpenAPIScripMaster.json`` into the shared master.
+
+    The file is public, so no broker session is needed. It is the platform's
+    primary instrument source: the SmartAPI quote endpoint only understands
+    the tokens it publishes, so a master without it resolves symbols to
+    tokens no quote request can price.
+    """
+    from backend.angel import instruments as angel_instruments
+
+    try:
+        result = angel_instruments.sync(url=url)
+    except Exception as error:  # noqa: BLE001 - a source failure is reported, not raised
+        log.warning("Angel One instrument master sync failed: %s", error)
+        return {"status": "failed", "error": str(error), "counts": {}, "total": 0}
+    if result.get("status") == "ready":
+        search_index.invalidate()
+    return result
+
+
+def sync(
+    session_call,
+    *,
+    segments: Iterable[str] = SEGMENTS,
+    include_angel: bool = True,
+) -> dict[str, Any]:
+    """Download and persist the scrip master for the requested segments.
+
+    Both sources are refreshed: the Kotak CSVs (which need an authenticated
+    session) and, unless `include_angel` is turned off, Angel One's public
+    JSON master.
+    """
     with _lock:
         _state["status"] = "syncing"
         counts: dict[str, int] = {}
@@ -154,8 +202,9 @@ def sync(session_call, *, segments: Iterable[str] = SEGMENTS) -> dict[str, Any]:
         try:
             files = fetch_segment_files(session_call)
         except Exception as error:  # noqa: BLE001
-            _state.update({"status": "failed", "error": str(error)})
-            return {"status": "failed", "error": str(error), "counts": {}}
+            files = {}
+            errors.append(f"kotak: {error}")
+            log.warning("Kotak scrip master listing failed: %s", error)
 
         timestamp = now()
         with app_cursor() as cursor:
@@ -192,7 +241,16 @@ def sync(session_call, *, segments: Iterable[str] = SEGMENTS) -> dict[str, Any]:
 
             meta_set(cursor, "scrip_master_synced_at", str(timestamp))
 
-        if errors and not any(key in counts for key in SEGMENTS):
+        # Angel One's JSON master is synced outside the Kotak transaction: it
+        # opens its own connection and must not be nested in this one.
+        if include_angel:
+            angel_result = sync_angel()
+            if angel_result.get("status") == "ready":
+                counts[ANGEL_SOURCE] = int(angel_result.get("total") or 0)
+            else:
+                errors.append(f"angel: {angel_result.get('error') or 'sync failed'}")
+
+        if errors and not any(key in counts for key in (*SEGMENTS, ANGEL_SOURCE)):
             _state.update({"status": "failed", "error": "; ".join(errors)})
             return {"status": "failed", "error": "; ".join(errors), "counts": counts}
 
@@ -208,12 +266,15 @@ def status() -> dict[str, Any]:
         synced_at = meta_get(cursor, "scrip_master_synced_at")
         cursor.execute("SELECT COUNT(*) AS total FROM instruments")
         total = cursor.fetchone()["total"]
+        cursor.execute("SELECT source, COUNT(*) AS total FROM instruments GROUP BY source")
+        sources = {str(row["source"]): int(row["total"]) for row in cursor.fetchall()}
     return {
         "status": _state["status"],
         "last_sync": float(synced_at) if synced_at else None,
         "last_error": _state["error"],
         "counts": _state["counts"],
         "instruments": total,
+        "sources": sources,
         "stale": bool(synced_at) and (time.time() - float(synced_at) > SYNC_INTERVAL_SECONDS * 2),
     }
 
@@ -259,11 +320,25 @@ def get_instrument(token: str, exchange_segment: str) -> dict[str, Any] | None:
 
 
 def instrument_display(token: str, exchange_segment: str) -> tuple[str, str | None]:
-    """Return the display symbol and optional company name for a token."""
+    """Return the display symbol and optional company name for a token.
+
+    The trading symbol is preferred: it is what the exchange shows and what
+    the operator recognises ("RELIANCE", not "RELIANCE INDUSTRIES LTD."). A
+    token the master does not know is returned as it is, so the caller can
+    decide what to show instead of receiving a decorated token.
+    """
     instrument = get_instrument(token, exchange_segment)
-    if instrument:
-        return str(instrument.get("symbol") or instrument.get("trading_symbol") or token), instrument.get("name")
-    return f"{token} (Unknown)", None
+    if not instrument:
+        return str(token), None
+    symbol = (
+        search_index.clean_symbol(instrument.get("trading_symbol"))
+        or search_index.clean_symbol(instrument.get("symbol"))
+        or str(token)
+    )
+    name = instrument.get("name") or None
+    if name and str(name).strip().upper() == symbol.upper():
+        name = None
+    return symbol, name
 
 
 def list_by_trading_symbol(trading_symbol: str, exchange_segment: str | None = None) -> list[dict[str, Any]]:
@@ -281,6 +356,8 @@ def option_contracts(
     underlying: str,
     exchange_segment: str = "nse_fo",
     expiry: str | None = None,
+    *,
+    source: str | None = None,
 ) -> dict[str, Any]:
     """Every CE/PE contract for an underlying, grouped by expiry.
 
@@ -290,12 +367,19 @@ def option_contracts(
 
     When `expiry` is given (ISO ``YYYY-MM-DD``) only that series is returned, so
     the option chain can show a chosen expiry instead of always the near one.
+
+    `source` narrows the result to one master (``"angel"`` or ``"kotak"``).
+    The token namespace matters: a caller that quotes with SmartAPI needs the
+    Angel rows, one that orders through Kotak Neo needs the Kotak rows.
     """
     clause = ""
     params: list[Any] = [underlying, exchange_segment]
     if expiry:
-        clause = " AND expiry = ?"
+        clause += " AND expiry = ?"
         params.append(expiry)
+    if source:
+        clause += " AND source = ?"
+        params.append(source)
     with app_cursor() as cursor:
         cursor.execute(
             f"""

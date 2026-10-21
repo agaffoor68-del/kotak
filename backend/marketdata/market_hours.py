@@ -89,11 +89,31 @@ def seconds_until_open(moment: datetime | None = None) -> int:
 # ------------------------------------------------------------------- breadth
 
 
+def change_percent(quote: Any) -> float | None:
+    """The percentage change of a quote, in percent.
+
+    The broker's snapshot does not always carry a precomputed percentage, but
+    it does carry the last traded price and the previous close. The change is
+    derived from those two prices so an instrument is never counted as
+    unchanged just because a field was missing.
+    """
+    percent = getattr(quote, "change_percent", None)
+    if percent is not None:
+        return float(percent)
+    last = getattr(quote, "last", None)
+    previous_close = getattr(quote, "previous_close", None)
+    if last is None or not previous_close:
+        return None
+    return round(((float(last) - float(previous_close)) / float(previous_close)) * 100.0, 4)
+
+
 def breadth(quotes: list[Any]) -> dict[str, Any]:
     """Advance/decline statistics across a quote set.
 
-    `quotes` must be real `Quote` objects from the engine. Instruments with no
-    price are excluded from the counts rather than counted as unchanged.
+    `quotes` must be real `Quote` objects from the engine. An instrument
+    advances when its last traded price is above the previous close and
+    declines when it is below; instruments with no price are excluded from
+    the counts rather than counted as unchanged.
     """
     advances = declines = unchanged = 0
     up_volume = down_volume = 0.0
@@ -101,10 +121,12 @@ def breadth(quotes: list[Any]) -> dict[str, Any]:
     priced = 0
 
     for quote in quotes:
-        if quote.last is None or quote.change_percent is None:
+        if getattr(quote, "last", None) is None:
+            continue
+        percent = change_percent(quote)
+        if percent is None:
             continue
         priced += 1
-        percent = quote.change_percent
         if percent > 0.05:
             advances += 1
         elif percent < -0.05:
@@ -140,9 +162,14 @@ def breadth(quotes: list[Any]) -> dict[str, Any]:
 
 def rank(quotes: list[Any], *, limit: int = 10, reverse: bool = True) -> list[dict[str, Any]]:
     """Top movers by absolute percentage change."""
-    priced = [q for q in quotes if q.last is not None and q.change_percent is not None]
-    priced.sort(key=lambda q: abs(q.change_percent or 0), reverse=reverse)
-    return [q.to_dict() for q in priced[:limit]]
+    priced = [
+        (quote, change_percent(quote))
+        for quote in quotes
+        if getattr(quote, "last", None) is not None
+    ]
+    priced = [(quote, percent) for quote, percent in priced if percent is not None]
+    priced.sort(key=lambda item: abs(item[1]), reverse=reverse)
+    return [quote.to_dict() for quote, _ in priced[:limit]]
 
 
 def most_active(quotes: list[Any], limit: int = 10) -> list[dict[str, Any]]:
