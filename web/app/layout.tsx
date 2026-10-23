@@ -26,6 +26,7 @@ export const viewport: Viewport = {
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
       <head>
+        <meta httpEquiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://kotak-xs4d.onrender.com wss://kotak-xs4d.onrender.com;" />
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
       </head>
         <AuthProvider>
