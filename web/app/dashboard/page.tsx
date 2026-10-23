@@ -15,6 +15,7 @@ import type { BreadthSnapshot, MarketStatus, Quote, RiskStatus } from "@/lib/api
 import { AppShell } from "@/components/app-shell";
 import { Empty, ErrorNote, Loading, Metric, Panel, StatusChip } from "@/components/ui";
 import { SharePanel } from "@/components/share-panel";
+import { AiAdvisor } from "@/components/ai-advisor";
 import { clock, compact, compactInt, inr, num, percent, relative, toneClass } from "@/lib/format";
 import { quoteKey, useLiveFeed } from "@/lib/useLiveFeed";
 
@@ -125,6 +126,8 @@ function Overview() {
       </header>
 
       {error ? <ErrorNote error={error} onRetry={() => void load()} /> : null}
+
+      <AiAdvisor />
 
       {/* ---------------- indices ---------------- */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

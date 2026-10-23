@@ -465,6 +465,18 @@ export interface IndicatorCatalog {
   timeframes: string[];
 }
 
+export interface TradeSuggestion {
+  signal: "BUY CE" | "BUY PE" | "WAIT";
+  confidence: "High" | "Medium" | "Low";
+  reason: string;
+  strike: number;
+  underlying: string;
+  spot: number;
+  india_vix: number | null;
+  indicators: { rsi14: number; ema20: number; ema50: number; vwap: number; supertrend: "Green" | "Red" };
+  as_of: string;
+}
+
 export interface RiskStatus {
   equity: number;
   peak_equity: number;
@@ -799,6 +811,7 @@ export const api = {
     notes?: string;
   }) => post<{ id: string; created: boolean }>("/api/v1/paper/journal", body),
   resetPaper: () => post<Record<string, unknown>>("/api/v1/paper/reset"),
+  suggestTrade: () => get<TradeSuggestion>("/api/v1/ai/suggest_trade"),
   risk: () => get<RiskStatus>("/api/v1/risk"),
   updateRisk: (changes: Record<string, number | string>) =>
     put<Record<string, number | string>>("/api/v1/risk", changes),
