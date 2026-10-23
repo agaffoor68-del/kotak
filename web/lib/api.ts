@@ -838,7 +838,9 @@ export const api = {
   coach: (mode: "loss_analysis" | "strategy_suggestions" = "loss_analysis") =>
     get<CoachResponse>(`/api/v1/coach?mode=${mode}`),
 
-  // alerts
+  // AI
+  suggestTrade: () => get<Record<string, unknown>>("/api/v1/ai/suggest_trade"),
+  executeOption: (body: Record<string, unknown>) => post<Record<string, unknown>>("/api/v1/orders/options", body),
   alerts: () => get<{ alerts: AlertRow[]; channels: Record<string, boolean> }>("/api/v1/alerts"),
   createAlert: (body: { kind: string; symbol?: string; condition: Record<string, unknown>; channels: string[] }) =>
     post<AlertRow>("/api/v1/alerts", body),

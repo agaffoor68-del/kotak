@@ -1,11 +1,18 @@
 "use client";
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useEffect, useState } from "react";
 
 export function AiAdvisor() {
   const [data, setData] = useState<any>(null);
   useEffect(() => {
-    const load = async () => setData(await fetch("/api/v1/ai/suggest_trade").then(r=>r.json()));
+    const load = async () => {
+      try {
+        const res = await api.suggestTrade();
+        setData(res);
+      } catch {
+        setData(null);
+      }
+    };
     load();
     const t = setInterval(load, 300000);
     return () => clearInterval(t);
