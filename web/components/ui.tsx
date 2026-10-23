@@ -132,7 +132,7 @@ export function PriceCell({ value, percent: pct }: { value: ReactNode; percent?:
       {pct !== undefined && pct !== null ? (
         <span className={`num text-3xs ${toneClass(pct)}`}>
           {pct > 0 ? "+" : ""}
-          {pct.toFixed(2)}%
+          {typeof pct === 'number' ? pct.toFixed(2) : '0.00'}%
         </span>
       ) : null}
     </span>
