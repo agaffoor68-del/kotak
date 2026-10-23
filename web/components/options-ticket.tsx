@@ -77,4 +77,3 @@ export function OptionsTicket() {
     </div>
   );
 }
-EOF
