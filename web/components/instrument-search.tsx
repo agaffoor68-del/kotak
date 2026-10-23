@@ -28,7 +28,7 @@ function subtitle(instrument: Instrument): string {
   const name = (instrument.name ?? "").trim();
   if (name && name.toUpperCase() !== instrument.symbol.toUpperCase()) return name;
   const exchange = instrument.exchange_segment === "bse_cm" ? "BSE" : "NSE";
-  return `${exchange} · token ${instrument.token}`;
+  return exchange;
 }
 
 export function InstrumentSearch({
@@ -164,7 +164,7 @@ export function InstrumentSearch({
                     <span className="block truncate text-3xs text-ink-faint">{subtitle(instrument)}</span>
                   </span>
                   <span className="shrink-0 text-3xs text-ink-faint">
-                    {instrument.exchange_segment === "bse_cm" ? "BSE" : "NSE"} · {instrument.token}
+                    {instrument.exchange_segment === "bse_cm" ? "BSE" : "NSE"}
                   </span>
                 </button>
               </li>
