@@ -58,13 +58,13 @@ export async function ensureApiBase(): Promise<string> {
   const configured = window.localStorage.getItem("alphatrade.api-base");
   if (configured) {
     setApiBase(configured);
+    resolvedBase = base;
     return base;
   }
-  // A same-origin deployment needs no probing; only try it when the configured
-  // base actually points somewhere else.
-  if (!base.startsWith(window.location.origin)) {
-    candidates.push(window.location.origin);
-  }
+  // Vercel serves the web app and FastAPI from one origin through rewrites.
+  // Prefer that origin so API calls and the market WebSocket do not depend on
+  // a sleeping or CORS-restricted secondary host.
+  candidates.push(window.location.origin);
   if (base && !candidates.includes(base)) candidates.push(base);
   for (const known of KNOWN_BACKENDS) {
     if (!candidates.includes(known)) candidates.push(known);
@@ -762,6 +762,12 @@ export const api = {
       confirmation: LIVE_PHRASE,
     }),
   paperOrder: (order: Record<string, unknown>) => post<Record<string, unknown>>("/api/v1/paper/orders", order),
+  executeOption: (order: Record<string, unknown>) =>
+    post<Record<string, unknown>>("/api/v1/paper/orders", {
+      ...order,
+      exchange_segment: "nse_fo",
+      mode: "paper",
+    }),
   paperClose: (symbol: string, quantity?: number) =>
     post<Record<string, unknown>>("/api/v1/paper/close", { trading_symbol: symbol, quantity }),
   paperPortfolio: () =>
