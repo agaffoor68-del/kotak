@@ -29,7 +29,6 @@ function OptionDesk() {
   const [selectedStrike, setSelectedStrike] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [liveTrading, setLiveTrading] = useState(false);
   const [session, setSession] = useState<{ state: string; isOpen: boolean } | null>(null);
 
   useEffect(() => {
@@ -40,7 +39,6 @@ function OptionDesk() {
     api
       .status()
       .then((status) => {
-        setLiveTrading(Boolean(status.features?.live_trading));
         setSession({ state: status.session?.state ?? "closed", isOpen: Boolean(status.session?.is_open) });
       })
       .catch(() => undefined);
@@ -166,10 +164,15 @@ function OptionDesk() {
 
             <OptionTradePanel
               chain={chain}
-              spot={spot}
-              selectedStrike={selectedStrike}
-              onSelectStrike={setSelectedStrike}
-              liveTradingEnabled={liveTrading}
+              underlying={underlying}
+              expiry={expiry}
+              expiries={expiries}
+              onUnderlyingChange={(value) => {
+                setUnderlying(value);
+                setExpiry("");
+                setSelectedStrike(null);
+              }}
+              onExpiryChange={setExpiry}
             />
           </div>
 

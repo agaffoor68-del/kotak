@@ -1,69 +1,23 @@
 "use client";
 
-/**
- * Options trade execution panel.
- *
- * The operator picks a side, a leg and a strike, sizes the position in lots
- * and sends it. The panel shows what will be sent — contract, premium,
- * quantity, charges, target and stop — before the order leaves, and it never
- * invents a price: everything comes from the live chain.
- */
-
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { OptionChain } from "@/lib/api";
 import { Field, Panel } from "@/components/ui";
-import { inr, num } from "@/lib/format";
 
-export type PositionSide = "long" | "short";
-export type OptionKind = "CE" | "PE" | "BOTH";
 export type StrikePreset = "ATM" | "ITM-1" | "ITM-2" | "OTM-1" | "OTM-2";
+const STRIKES: StrikePreset[] = ["ATM", "ITM-1", "ITM-2", "OTM-1", "OTM-2"];
 
-const PRESETS: StrikePreset[] = ["ATM", "ITM-1", "ITM-2", "OTM-1", "OTM-2"];
+type Choice = { value: string; label: string; tone?: "up" | "down" };
 
-const LIVE_ORDER_PHRASE = "LIVE";
-
-interface Leg {
-  kind: "call" | "put";
-  strike: number;
-  token?: string;
-  trading_symbol?: string;
-  ltp: number | null;
-  bid: number | null;
-  ask: number | null;
-  lot_size: number | null;
-}
-
-function Toggle<T extends string>({
-  value,
-  options,
-  onChange,
-  name,
-}: {
-  value: T;
-  options: { value: T; label: string; tone?: "up" | "down" }[];
-  onChange: (next: T) => void;
-  name: string;
-}) {
+function Toggle({ value, options, onChange, label }: { value: string; options: Choice[]; onChange: (value: string) => void; label: string }) {
   return (
-    <div className="flex rounded-md border border-hairline bg-canvas p-0.5" role="group" aria-label={name}>
+    <div className="flex rounded-md border border-hairline bg-canvas p-0.5" role="group" aria-label={label}>
       {options.map((option) => {
         const active = option.value === value;
-        const tone = active
-          ? option.tone === "up"
-            ? "bg-up/20 text-up"
-            : option.tone === "down"
-              ? "bg-down/20 text-down"
-              : "bg-accent/20 text-accent"
-          : "text-ink-dim hover:text-ink";
+        const tone = active ? (option.tone === "up" ? "bg-up/20 text-up" : option.tone === "down" ? "bg-down/20 text-down" : "bg-accent/20 text-accent") : "text-ink-dim hover:text-ink";
         return (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            className={`flex-1 rounded px-2 py-1.5 text-2xs font-semibold transition-colors ${tone}`}
-            aria-pressed={active}
-          >
+          <button key={option.value} type="button" aria-pressed={active} onClick={() => onChange(option.value)} className={`flex-1 rounded px-2 py-2 text-2xs font-semibold transition-colors ${tone}`}>
             {option.label}
           </button>
         );
@@ -74,366 +28,94 @@ function Toggle<T extends string>({
 
 export function OptionTradePanel({
   chain,
-  spot,
-  selectedStrike,
-  onSelectStrike,
-  liveTradingEnabled,
+  underlying,
+  expiry,
+  expiries,
+  onUnderlyingChange,
+  onExpiryChange,
 }: {
   chain: OptionChain;
-  spot: number | null;
-  selectedStrike: number | null;
-  onSelectStrike: (strike: number) => void;
-  liveTradingEnabled: boolean;
+  underlying: string;
+  expiry: string;
+  expiries: string[];
+  onUnderlyingChange: (value: string) => void;
+  onExpiryChange: (value: string) => void;
 }) {
-  const [side, setSide] = useState<PositionSide>("long");
-  const [kind, setKind] = useState<OptionKind>("CE");
-  const [preset, setPreset] = useState<StrikePreset>("ATM");
+  const [strike, setStrike] = useState<StrikePreset>("ATM");
+  const [type, setType] = useState<"CE" | "PE">("CE");
+  const [action, setAction] = useState<"BUY" | "SELL">("BUY");
   const [lots, setLots] = useState(1);
-  const [orderType, setOrderType] = useState<"MKT" | "L">("MKT");
-  const [limitPrice, setLimitPrice] = useState(0);
-  const [takeProfitPct, setTakeProfitPct] = useState(10);
-  const [stopLossPct, setStopLossPct] = useState(5);
-  const [mode, setMode] = useState<"paper" | "live">("paper");
-  const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "up" | "down"; text: string } | null>(null);
 
-  const strikes = useMemo(() => chain.rows.map((row) => row.strike).sort((a, b) => a - b), [chain.rows]);
+  const resolvedStrike = useMemo(() => {
+    const strikes = chain.rows.map((row) => row.strike).sort((a, b) => a - b);
+    const atm = chain.summary.atm_strike ?? chain.spot ?? strikes[Math.floor(strikes.length / 2)];
+    const atmIndex = strikes.reduce((best, value, index) => Math.abs(value - atm) < Math.abs(strikes[best] - atm) ? index : best, 0);
+    const distance = strike === "ITM-1" || strike === "OTM-1" ? 1 : strike === "ITM-2" || strike === "OTM-2" ? 2 : 0;
+    const direction = type === "CE" ? (strike.startsWith("ITM") ? -1 : 1) : (strike.startsWith("ITM") ? 1 : -1);
+    return strikes[Math.max(0, Math.min(strikes.length - 1, atmIndex + direction * distance))] ?? null;
+  }, [chain.rows, chain.summary.atm_strike, chain.spot, strike, type]);
 
-  /** The index of the strike closest to the money. */
-  const atmIndex = useMemo(() => {
-    if (!strikes.length) return -1;
-    const atm = chain.summary.atm_strike;
-    if (atm !== null) {
-      const exact = strikes.findIndex((strike) => Math.abs(strike - atm) < 1e-9);
-      if (exact >= 0) return exact;
-    }
-    if (spot === null) return Math.floor(strikes.length / 2);
-    let best = 0;
-    let distance = Math.abs(strikes[0] - spot);
-    strikes.forEach((strike, index) => {
-      const current = Math.abs(strike - spot);
-      if (current < distance) {
-        distance = current;
-        best = index;
-      }
-    });
-    return best;
-  }, [strikes, chain.summary.atm_strike, spot]);
-
-  /** The legs the current selection resolves to. */
-  const legs = useMemo<Leg[]>(() => {
-    if (atmIndex < 0) return [];
-    const step = (index: number) => strikes[Math.min(strikes.length - 1, Math.max(0, index))];
-    const rowFor = (strike: number) => chain.rows.find((row) => Math.abs(row.strike - strike) < 1e-9);
-    const toLeg = (kind: "call" | "put", strike: number): Leg | null => {
-      const row = rowFor(strike);
-      if (!row) return null;
-      const source = kind === "call" ? row.call : row.put;
-      return {
-        kind,
-        strike,
-        token: source.token,
-        trading_symbol: source.trading_symbol,
-        ltp: source.ltp,
-        bid: source.bid,
-        ask: source.ask,
-        lot_size: source.lot_size ?? null,
-      };
-    };
-
-    const distance = preset === "ITM-1" || preset === "OTM-1" ? 1 : preset === "ITM-2" || preset === "OTM-2" ? 2 : 0;
-    const inTheMoney = preset === "ATM" || preset.startsWith("ITM");
-
-    if (kind === "BOTH") {
-      // A straddle at the money, a strangle away from it: the call sits on one
-      // side of the money and the put on the other.
-      const callIndex = inTheMoney ? atmIndex - distance : atmIndex + distance;
-      const putIndex = inTheMoney ? atmIndex + distance : atmIndex - distance;
-      const call = toLeg("call", step(callIndex));
-      const put = toLeg("put", step(putIndex));
-      return [call, put].filter((leg): leg is Leg => leg !== null);
-    }
-
-    const direction = kind === "CE" ? (inTheMoney ? -1 : 1) : inTheMoney ? 1 : -1;
-    const leg = toLeg(kind === "CE" ? "call" : "put", step(atmIndex + direction * distance));
-    return leg ? [leg] : [];
-  }, [atmIndex, chain.rows, kind, preset, strikes]);
-
-  // Keep the chain selection in step with the panel.
-  useEffect(() => {
-    if (!legs.length) return;
-    const first = legs[0].strike;
-    if (selectedStrike === null || Math.abs(selectedStrike - first) > 1e-9) {
-      onSelectStrike(first);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [legs]);
-
-  const lotSize = legs[0]?.lot_size ?? null;
-  const totalQuantity = Math.max(0, Math.round(lots * (lotSize ?? 1)));
-  const perLegQuantity = kind === "BOTH" ? Math.floor(totalQuantity / 2) : totalQuantity;
-  const referencePrice = legs[0]?.ltp ?? null;
-  const estimatedCharges = useRefCharges(perLegQuantity, referencePrice);
-
-  const target = useMemo(() => {
-    if (!referencePrice) return null;
-    const factor = side === "long" ? 1 + takeProfitPct / 100 : 1 - takeProfitPct / 100;
-    return referencePrice * factor;
-  }, [referencePrice, side, takeProfitPct]);
-
-  const stop = useMemo(() => {
-    if (!referencePrice) return null;
-    const factor = side === "long" ? 1 - stopLossPct / 100 : 1 + stopLossPct / 100;
-    return referencePrice * factor;
-  }, [referencePrice, side, stopLossPct]);
-
-  const execute = useCallback(async () => {
-    if (!legs.length || !perLegQuantity) {
-      setMessage({ tone: "down", text: "Pick a strike with a live price before sending the order." });
+  async function execute() {
+    if (!expiry || !resolvedStrike || lots < 1) {
+      setMessage({ tone: "down", text: "Select an expiry and enter at least one lot." });
       return;
     }
     setBusy(true);
     setMessage(null);
     try {
-      const placed: string[] = [];
-      for (const leg of legs) {
-        const quantity = kind === "BOTH" ? perLegQuantity : totalQuantity;
-        const price = orderType === "L" ? limitPrice : leg.ltp ?? 0;
-        const payload = {
-          exchange_segment: "nse_fo",
-          product: "NRML",
-          trading_symbol: leg.trading_symbol ?? "",
-          transaction_type: side === "long" ? "B" : "S",
-          order_type: orderType,
-          quantity,
-          price: orderType === "L" ? price : 0,
-          trigger_price: 0,
-          validity: "DAY",
-          instrument_token: leg.token ?? "",
-          // The exit levels travel with the position.
-          take_profit_pct: takeProfitPct,
-          stop_loss_pct: stopLossPct,
-          // A live order is only unlocked by typing the phrase.
-          confirmation: mode === "live" ? confirmation : "",
-        };
-        if (mode === "paper") {
-          await api.paperOrder(payload);
-        } else {
-          await api.liveOrder(payload);
-        }
-        placed.push(`${leg.kind === "call" ? "CE" : "PE"} ${num(leg.strike, 0)}`);
-      }
-      setMessage({
-        tone: "up",
-        text: `${mode === "paper" ? "Paper" : "Live"} order sent: ${placed.join(" + ")} · ${perLegQuantity * legs.length} units.`,
-      });
+      await api.executeOption({ underlying, expiry, strike, type, action, lots });
+      setMessage({ tone: "up", text: `${action} ${lots} lot ${underlying} ${strike} ${type} order sent.` });
     } catch (failure) {
-      setMessage({
-        tone: "down",
-        text: failure instanceof Error ? failure.message : "The order could not be sent.",
-      });
+      setMessage({ tone: "down", text: failure instanceof Error ? failure.message : "The order could not be sent." });
     } finally {
       setBusy(false);
     }
-  }, [legs, kind, limitPrice, mode, orderType, perLegQuantity, side, stopLossPct, takeProfitPct, totalQuantity, confirmation]);
+  }
 
   return (
-    <Panel
-      title="Trade execution"
-      subtitle="Build the position, then send it"
-      actions={
-        <Toggle
-          name="Execution mode"
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: "paper", label: "Paper" },
-            { value: "live", label: "Live", tone: "down" },
-          ]}
-        />
-      }
-    >
-      <div className="space-y-3">
-        <Field label="Position type">
-          <Toggle
-            name="Position type"
-            value={side}
-            onChange={setSide}
-            options={[
-              { value: "long", label: "Long (Buy)", tone: "up" },
-              { value: "short", label: "Short (Sell)", tone: "down" },
-            ]}
-          />
-        </Field>
-
-        <Field label="Option type">
-          <Toggle
-            name="Option type"
-            value={kind}
-            onChange={setKind}
-            options={[
-              { value: "CE", label: "Call (CE)" },
-              { value: "PE", label: "Put (PE)" },
-              { value: "BOTH", label: "Both" },
-            ]}
-          />
-        </Field>
-
-        <Field label="Strike" hint={legs.length ? `Resolves to ${legs.map((leg) => num(leg.strike, 0)).join(" / ")}` : undefined}>
-          <select
-            className="field-select"
-            value={preset}
-            onChange={(event) => setPreset(event.target.value as StrikePreset)}
-          >
-            {PRESETS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Quantity (lots)">
-            <input
-              className="field-input"
-              type="number"
-              min={1}
-              step={1}
-              value={lots}
-              onChange={(event) => setLots(Math.max(1, Number(event.target.value) || 1))}
-            />
+    <Panel title="Options trading ticket" subtitle="Send a human-readable paper order to the execution API">
+      <div className="flex flex-col gap-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Underlying">
+            <select className="field-select" value={underlying} onChange={(event) => onUnderlyingChange(event.target.value)}>
+              <option value="NIFTY">NIFTY 50</option>
+              <option value="BANKNIFTY">BANKNIFTY</option>
+            </select>
           </Field>
-          <Field label="Order type">
-            <select
-              className="field-select"
-              value={orderType}
-              onChange={(event) => setOrderType(event.target.value as "MKT" | "L")}
-            >
-              <option value="MKT">Market</option>
-              <option value="L">Limit</option>
+          <Field label="Expiry">
+            <select className="field-select" value={expiry} onChange={(event) => onExpiryChange(event.target.value)} disabled={!expiries.length}>
+              {expiries.length ? expiries.map((value) => <option key={value} value={value}>{value}</option>) : <option value="">Nearest expiry</option>}
             </select>
           </Field>
         </div>
 
-        {orderType === "L" ? (
-          <Field label="Limit price">
-            <input
-              className="field-input"
-              type="number"
-              min={0}
-              step={0.05}
-              value={limitPrice}
-              onChange={(event) => setLimitPrice(Number(event.target.value) || 0)}
-            />
-          </Field>
-        ) : null}
+        <Field label="Strike" hint={resolvedStrike ? `Resolves to ${resolvedStrike}` : "No strike available"}>
+          <div className="grid grid-cols-5 gap-1.5" role="group" aria-label="Strike selector">
+            {STRIKES.map((value) => <button key={value} type="button" aria-pressed={strike === value} onClick={() => setStrike(value)} className={`rounded border px-1 py-2 text-2xs font-semibold transition-colors ${strike === value ? "border-accent bg-accent/20 text-accent" : "border-hairline bg-canvas text-ink-dim hover:text-ink"}`}>{value}</button>)}
+          </div>
+        </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Take profit (%)">
-            <input
-              className="field-input"
-              type="number"
-              min={0}
-              step={0.5}
-              value={takeProfitPct}
-              onChange={(event) => setTakeProfitPct(Number(event.target.value) || 0)}
-            />
-          </Field>
-          <Field label="Stop loss (%)">
-            <input
-              className="field-input"
-              type="number"
-              min={0}
-              step={0.5}
-              value={stopLossPct}
-              onChange={(event) => setStopLossPct(Number(event.target.value) || 0)}
-            />
-          </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Option type"><Toggle label="Option type" value={type} onChange={(value) => setType(value as "CE" | "PE")} options={[{ value: "CE", label: "CE (Call)" }, { value: "PE", label: "PE (Put)" }]} /></Field>
+          <Field label="Position type"><Toggle label="Position type" value={action} onChange={(value) => setAction(value as "BUY" | "SELL")} options={[{ value: "BUY", label: "BUY", tone: "up" }, { value: "SELL", label: "SELL", tone: "down" }]} /></Field>
         </div>
 
-        <dl className="space-y-1.5 rounded-md border border-hairline bg-canvas/60 px-3 py-2.5 text-2xs">
-          <Summary label="Contracts" value={legs.map((leg) => leg.trading_symbol ?? "—").join("  ·  ") || "—"} />
-          <Summary label="Premium (LTP)" value={referencePrice === null ? "—" : num(referencePrice)} />
-          <Summary label="Quantity" value={`${perLegQuantity * legs.length} units${lotSize ? ` (${lots} × ${lotSize})` : ""}`} />
-          <Summary label="Target / stop" value={`${target === null ? "—" : num(target)} / ${stop === null ? "—" : num(stop)}`} />
-          <Summary label="Est. charges (round trip)" value={estimatedCharges === null ? "—" : inr(estimatedCharges)} />
-        </dl>
+        <Field label="Quantity (lots)">
+          <input className="field-input" type="number" min={1} step={1} value={lots} onChange={(event) => setLots(Math.max(1, Number(event.target.value) || 1))} />
+        </Field>
 
-        {mode === "live" && !liveTradingEnabled ? (
-          <p className="rounded border border-warn/40 bg-warn-soft px-3 py-2 text-2xs text-warn">
-            Live trading is disabled on this deployment. Switch to Paper, or enable live trading in the settings.
-          </p>
-        ) : null}
+        <div className="rounded-md border border-hairline bg-canvas/60 px-3 py-2.5 text-2xs">
+          <div className="flex items-center justify-between gap-3"><span className="text-ink-faint">Order preview</span><span className="num font-semibold text-ink">{action} · {underlying} · {strike} · {type}</span></div>
+          <div className="mt-1 flex items-center justify-between gap-3"><span className="text-ink-faint">Expiry / quantity</span><span className="num text-ink">{expiry || "—"} · {lots} lot{lots === 1 ? "" : "s"}</span></div>
+        </div>
 
-        {mode === "live" ? (
-          <Field label="Confirm the live order" hint={`Type "${LIVE_ORDER_PHRASE}" to unlock it`}>
-            <input
-              className="field-input"
-              value={confirmation}
-              placeholder={LIVE_ORDER_PHRASE}
-              onChange={(event) => setConfirmation(event.target.value)}
-            />
-          </Field>
-        ) : null}
-
-        {message ? (
-          <p className={`text-2xs ${message.tone === "up" ? "text-up" : "text-down"}`} role="status">
-            {message.text}
-          </p>
-        ) : null}
-
-        <button
-          className={`btn w-full ${mode === "live" ? "btn-danger" : "btn-primary"}`}
-          type="button"
-          onClick={() => void execute()}
-          disabled={
-            busy ||
-            !legs.length ||
-            !perLegQuantity ||
-            (mode === "live" && (!liveTradingEnabled || confirmation !== LIVE_ORDER_PHRASE))
-          }
-        >
-          {busy ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-edge border-t-canvas" /> : null}
-          {busy ? "Sending…" : mode === "live" ? "EXECUTE ORDER · LIVE" : "EXECUTE ORDER · PAPER"}
+        {message ? <p className={`text-2xs ${message.tone === "up" ? "text-up" : "text-down"}`} role="status">{message.text}</p> : null}
+        <button className={`btn w-full ${action === "BUY" ? "btn-buy" : "btn-sell"}`} type="button" onClick={() => void execute()} disabled={busy || !expiry || !resolvedStrike}>
+          {busy ? "Sending…" : "EXECUTE OPTION ORDER"}
         </button>
       </div>
     </Panel>
   );
-}
-
-function Summary({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <dt className="text-ink-faint">{label}</dt>
-      <dd className="num text-right text-ink">{value}</dd>
-    </div>
-  );
-}
-
-/** The statutory charges for the prospective order, for the summary line. */
-function useRefCharges(quantity: number, price: number | null) {
-  const [charges, setCharges] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!quantity || !price) {
-      setCharges(null);
-      return;
-    }
-    let cancelled = false;
-    api
-      .charges("nse_fo", "NRML", quantity, price, true)
-      .then((payload) => {
-        if (!cancelled) setCharges(payload.round_trip);
-      })
-      .catch(() => {
-        if (!cancelled) setCharges(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [quantity, price]);
-
-  return charges;
 }
