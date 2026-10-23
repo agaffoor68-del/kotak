@@ -185,7 +185,7 @@ def _build() -> _Index:
             SELECT token, exchange_segment, symbol, trading_symbol, name, series,
                    instrument_type, is_index, lot_size, tick_size
             FROM instruments
-            WHERE exchange_segment IN (?, ?)
+            WHERE exchange_segment IN (?, ?, ?, ?)
             """,
             INDEXED_SEGMENTS,
         )

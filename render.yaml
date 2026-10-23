@@ -76,7 +76,7 @@ services:
       - key: RECORD_TICKS
         value: 1
       - key: ALLOWED_ORIGINS
-        value: "*" # any origin; set a comma-separated list to lock it down
+        sync: false # "*" for any origin, or a comma-separated list, e.g. https://kotak-jade.vercel.app
       - key: FRONTEND_URL
         sync: false
       - key: PUBLIC_URL

@@ -231,10 +231,16 @@ class Settings:
         self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
         # --- CORS / public URL ------------------------------------------
-        # The frontend is deployed on a different host than the API and its
-        # origin changes with every preview deployment, so the default is to
-        # accept any origin. Set ALLOWED_ORIGINS to a comma-separated list to
-        # lock it down again; "*" means "any".
+        # The frontend is deployed on a different host than the API, and the
+        # origin changes with every preview deployment, so a fixed allow-list
+        # turns into "Cannot reach the backend" for every new URL. "*" means
+        # "any origin"; ALLOWED_ORIGINS narrows it to a comma-separated list.
+        #
+        # The wildcard is never combined with credentials (see backend/main.py):
+        # accepting any origin *with* credentials is what turns a bearer-token
+        # API into a CSRF target the moment a cookie is ever set. The list is
+        # deployment-owned, not code-owned, so a deployment can pin it without
+        # a code change.
         self.allowed_origins = [
             origin.strip()
             for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",")
@@ -242,14 +248,6 @@ class Settings:
         ]
         self.public_url = os.getenv("PUBLIC_URL", "").rstrip("/")
         self.frontend_url = os.getenv("FRONTEND_URL", "").rstrip("/")
-
-        # Outside production the terminal is routinely opened from a phone or a
-        # LAN address rather than localhost, and that address moves with DHCP.
-        # Pinning one origin works until the lease renews, and then every request
-        # fails as "Failed to fetch" with nothing in the browser console to
-        # explain it. The origin list above is therefore the single switch:
-        # it accepts any origin by default, and ALLOWED_ORIGINS narrows it.
-        self.allowed_origin_regex = None
 
         # --- feature gates -----------------------------------------------
         self.enable_live_trading = _flag("ENABLE_LIVE_TRADING", False)
