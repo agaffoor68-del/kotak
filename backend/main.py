@@ -31,6 +31,7 @@ from backend.api.routes import (
     broker,
     deployment,
     execution,
+    fyers,
     market,
     options,
     share,
@@ -205,6 +206,7 @@ app.include_router(strategies.router)
 app.include_router(strategies.backtest_router)
 app.include_router(execution.router)
 app.include_router(ai.router)
+app.include_router(fyers.router)
 app.include_router(analytics.router)
 app.include_router(share.router)
 app.include_router(deployment.router)
