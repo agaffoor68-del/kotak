@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from backend.analytics import metrics
+from backend.core.database import app_cursor, now
 from backend.execution.charges import compute as compute_charges
 from backend.marketdata import ticks
 from backend.marketdata.ticks import INTERVAL_SECONDS
@@ -373,6 +375,26 @@ def run(
             f"Backtested {bars} bars across {len(tradable)} instrument(s) using persisted historical candles."
         ),
     )
+
+
+def save_backtest_trades(account_id: str, trades: list[BacktestTrade], strategy_id: str | None = None) -> int:
+    """Persist closed simulation trades for the read-only backtesting analytics tab."""
+    if not trades:
+        return 0
+    with app_cursor() as cursor:
+        for trade in trades:
+            cursor.execute(
+                """
+                INSERT INTO backtest_trades
+                    (id, account_id, strategy_id, symbol, side, quantity, entry_price, exit_price,
+                     entry_time, exit_time, gross_pnl, charges, net_pnl, reason, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (uuid.uuid4().hex, account_id, strategy_id, trade.symbol, trade.side, trade.quantity,
+                 trade.entry_price, trade.exit_price, trade.entry_time, trade.exit_time,
+                 trade.gross_pnl, trade.charges, trade.net_pnl, trade.reason, now()),
+            )
+    return len(trades)
 
 
 def _close_trade(

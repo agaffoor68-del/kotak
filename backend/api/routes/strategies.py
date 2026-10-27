@@ -469,6 +469,10 @@ def _simulate(
         initial_capital=initial_capital, slippage=slippage, timeframe=interval,
     )
     payload_dict = result.to_dict()
+    if result.status == "ok":
+        payload_dict["saved_backtest_trades"] = engine.save_backtest_trades(
+            resolve_account_id(user), result.trades, strategy_id
+        )
 
     # Persist the run so the approval lifecycle has evidence to check. Without
     # this a strategy could never legitimately reach "backtested".

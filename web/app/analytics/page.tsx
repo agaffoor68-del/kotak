@@ -22,11 +22,12 @@ function Analytics() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"daily" | "monthly">("daily");
+  const [mode, setMode] = useState<"paper" | "backtesting">("paper");
 
   const load = useCallback(async () => {
     try {
       const [performance, strategies, grid] = await Promise.all([
-        api.performance(),
+        api.performance(mode),
         api.strategyAnalytics().catch(() => [] as StrategyRow[]),
         api.performanceHeatmap(180).catch(() => ({ grid: {}, weekdays: [], days: 180 })),
       ]);
@@ -39,7 +40,7 @@ function Analytics() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     void load();
@@ -72,8 +73,9 @@ function Analytics() {
   if (!data?.has_data) {
     return (
       <div className="space-y-4">
-        <header>
+        <header className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold tracking-tight">Analytics</h1>
+          <ModeTabs mode={mode} onChange={setMode} />
         </header>
         {error ? <ErrorNote error={error} onRetry={() => void load()} /> : null}
         <Empty
@@ -91,9 +93,12 @@ function Analytics() {
           <h1 className="text-lg font-semibold tracking-tight">Analytics</h1>
           <p className="text-2xs text-ink-faint">Computed from your own closed trades, net of charges</p>
         </div>
-        <button className="btn btn-sm" onClick={() => void load()} type="button">
-          Refresh
-        </button>
+          <div className="flex items-center gap-2">
+            <ModeTabs mode={mode} onChange={setMode} />
+            <button className="btn btn-sm" onClick={() => void load()} type="button">
+              Refresh
+            </button>
+          </div>
       </header>
 
       {error ? <ErrorNote error={error} onRetry={() => void load()} /> : null}
@@ -213,6 +218,18 @@ function Analytics() {
           <li>• <span className="text-ink-dim">Profit factor</span> is gross profit divided by gross loss; undefined when there are no losses.</li>
         </ul>
       </Panel>
+    </div>
+  );
+}
+
+function ModeTabs({ mode, onChange }: { mode: "paper" | "backtesting"; onChange: (mode: "paper" | "backtesting") => void }) {
+  return (
+    <div className="flex gap-1" role="tablist" aria-label="Analytics source">
+      {(["paper", "backtesting"] as const).map((key) => (
+        <button key={key} className={`btn btn-sm ${mode === key ? "btn-primary" : ""}`} onClick={() => onChange(key)} role="tab" aria-selected={mode === key} type="button">
+          {key === "paper" ? "Paper Trading" : "Backtesting"}
+        </button>
+      ))}
     </div>
   );
 }
