@@ -28,8 +28,8 @@ function Analytics() {
     try {
       const [performance, strategies, grid] = await Promise.all([
         api.performance(mode),
-        api.strategyAnalytics().catch(() => [] as StrategyRow[]),
-        api.performanceHeatmap(180).catch(() => ({ grid: {}, weekdays: [], days: 180 })),
+        api.strategyAnalytics(mode).catch(() => [] as StrategyRow[]),
+        api.performanceHeatmap(180, mode).catch(() => ({ grid: {}, weekdays: [], days: 180 })),
       ]);
       setData(performance);
       setByStrategy(strategies);

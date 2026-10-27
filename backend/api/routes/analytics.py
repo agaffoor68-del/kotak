@@ -37,40 +37,39 @@ def performance(mode: str = Query(default="paper", pattern="^(paper|backtesting)
     table = "trades" if mode == "paper" else "backtest_trades"
     with app_cursor() as cursor:
         cursor.execute(
-            f"SELECT *, net_pnl AS net_pnl FROM {table} WHERE account_id = ? AND net_pnl IS NOT NULL ORDER BY exit_time ASC LIMIT 5000",
+            f"SELECT *, net_pnl AS net_pnl FROM {table} WHERE account_id = ? AND exit_time IS NOT NULL AND net_pnl IS NOT NULL ORDER BY exit_time ASC LIMIT 5000",
             (account_id,),
         )
         trades = [dict(row) for row in cursor.fetchall()]
-
-    if not trades:
-        return {
-            "has_data": False,
-            "note": "No closed trades recorded yet. Performance metrics appear once trades are on the book.",
-        }
 
     equity = [paper.DEFAULT_PAPER_CAPITAL]
     for trade in trades:
         equity.append(equity[-1] + float(trade.get("net_pnl") or 0))
 
     return {
-        "has_data": True,
+        "mode": mode,
+        "has_data": bool(trades),
         "summary": metrics.summarise(equity, trades, period_seconds=86400),
         "daily": metrics.daily_pnl(trades, days=60),
         "monthly": metrics.monthly_pnl(trades),
         "drawdown_curve": metrics.drawdown_series(equity),
+        "note": None if trades else f"No closed {mode} trades recorded yet.",
     }
 
 
 @router.get("/analytics/strategies")
-def strategy_analytics(user: CurrentUser = Depends(current_user)) -> list[dict[str, Any]]:
-    """Per-strategy performance, split by trade count."""
+def strategy_analytics(mode: str = Query(default="paper", pattern="^(paper|backtesting)$"), user: CurrentUser = Depends(current_user)) -> list[dict[str, Any]]:
+    """Per-strategy performance for the selected analytics source."""
     account_id = resolve_account_id(user)
+    table = "trades" if mode == "paper" else "backtest_trades"
+    strategy_join = "LEFT JOIN strategies s ON s.id = t.strategy_run_id" if mode == "paper" else "LEFT JOIN strategies s ON s.id = t.strategy_id"
+    strategy_column = "t.strategy_run_id" if mode == "paper" else "t.strategy_id"
     with app_cursor() as cursor:
         cursor.execute(
-            """
-            SELECT s.id, s.name, t.strategy_run_id, t.net_pnl, t.entry_time, t.exit_time
-            FROM trades t LEFT JOIN strategies s ON s.id = t.strategy_run_id
-            WHERE t.account_id = ? AND t.net_pnl IS NOT NULL
+            f"""
+            SELECT s.id, s.name, {strategy_column} AS strategy_id, t.net_pnl, t.entry_time, t.exit_time
+            FROM {table} t {strategy_join}
+            WHERE t.account_id = ? AND t.exit_time IS NOT NULL AND t.net_pnl IS NOT NULL
             """,
             (account_id,),
         )
@@ -78,7 +77,7 @@ def strategy_analytics(user: CurrentUser = Depends(current_user)) -> list[dict[s
 
     grouped: dict[str, dict[str, Any]] = {}
     for row in rows:
-        key = row["name"] or row["strategy_run_id"] or "manual"
+        key = row["name"] or row.get("strategy_id") or "manual"
         bucket = grouped.setdefault(key, {"strategy": key, "trades": [], "pnls": [], "names": set()})
         bucket["pnls"].append(float(row["net_pnl"] or 0))
         if row["name"]:
@@ -101,13 +100,14 @@ def strategy_analytics(user: CurrentUser = Depends(current_user)) -> list[dict[s
 
 
 @router.get("/analytics/heatmap")
-def performance_heatmap(days: int = Query(default=60, ge=1, le=365),
+def performance_heatmap(mode: str = Query(default="paper", pattern="^(paper|backtesting)$"), days: int = Query(default=60, ge=1, le=365),
                          user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
     """Day-of-week / month P&L grid, for the dashboard heatmap."""
     account_id = resolve_account_id(user)
     with app_cursor() as cursor:
+        table = "trades" if mode == "paper" else "backtest_trades"
         cursor.execute(
-            "SELECT exit_time, net_pnl FROM trades WHERE account_id = ? AND net_pnl IS NOT NULL ORDER BY exit_time DESC LIMIT 5000",
+            f"SELECT exit_time, net_pnl FROM {table} WHERE account_id = ? AND exit_time IS NOT NULL AND net_pnl IS NOT NULL ORDER BY exit_time DESC LIMIT 5000",
             (account_id,),
         )
         rows = [dict(row) for row in cursor.fetchall()]
