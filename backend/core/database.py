@@ -314,6 +314,25 @@ CREATE TABLE IF NOT EXISTS trades (
 );
 CREATE INDEX IF NOT EXISTS idx_trades_account ON trades(account_id, entry_time DESC);
 
+CREATE TABLE IF NOT EXISTS backtest_trades (
+    id            TEXT PRIMARY KEY,
+    account_id    TEXT NOT NULL,
+    strategy_id   TEXT,
+    symbol        TEXT NOT NULL,
+    side          TEXT NOT NULL,
+    quantity      REAL NOT NULL,
+    entry_price   REAL NOT NULL,
+    exit_price    REAL,
+    entry_time    REAL NOT NULL,
+    exit_time     REAL,
+    gross_pnl     REAL,
+    charges       REAL,
+    net_pnl       REAL,
+    reason        TEXT,
+    created_at    REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_backtest_trades_account ON backtest_trades(account_id, exit_time DESC);
+
 CREATE TABLE IF NOT EXISTS journal (
     id            TEXT PRIMARY KEY,
     account_id    TEXT NOT NULL,

@@ -31,12 +31,13 @@ class AlertModel(BaseModel):
 
 
 @router.get("/analytics/performance")
-def performance(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
-    """Full performance report for the account."""
+def performance(mode: str = Query(default="paper", pattern="^(paper|backtesting)$"), user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    """Full performance report for paper or persisted backtest trades."""
     account_id = resolve_account_id(user)
+    table = "trades" if mode == "paper" else "backtest_trades"
     with app_cursor() as cursor:
         cursor.execute(
-            "SELECT * FROM trades WHERE account_id = ? AND net_pnl IS NOT NULL ORDER BY exit_time ASC LIMIT 5000",
+            f"SELECT *, net_pnl AS net_pnl FROM {table} WHERE account_id = ? AND net_pnl IS NOT NULL ORDER BY exit_time ASC LIMIT 5000",
             (account_id,),
         )
         trades = [dict(row) for row in cursor.fetchall()]

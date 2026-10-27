@@ -543,6 +543,7 @@ export interface PnlBucket {
 }
 
 export interface PerformancePayload {
+  mode?: "paper" | "backtesting";
   has_data: boolean;
   note?: string;
   summary?: PerformanceSummary;
@@ -840,7 +841,7 @@ export const api = {
   angelReconnect: () => post<ExchangeSessionHealth>("/api/v1/broker/angel/session/reconnect"),
 
   // analytics
-  performance: () => get<PerformancePayload>("/api/v1/analytics/performance"),
+  performance: (mode: "paper" | "backtesting" = "paper") => get<PerformancePayload>(`/api/v1/analytics/performance?mode=${mode}`),
   strategyAnalytics: () => get<StrategyRow[]>("/api/v1/analytics/strategies"),
   performanceHeatmap: (days = 180) =>
     get<{ grid: Record<string, Record<string, number>>; weekdays: string[]; days: number }>(
