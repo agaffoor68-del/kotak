@@ -71,6 +71,22 @@ function TradeDesk() {
 
   // Indian charges preview, refreshed as the ticket changes.
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const option = params.get("option");
+    const underlying = params.get("underlying");
+    const strike = params.get("strike");
+    if (option === "CE" || option === "PE" || underlying || strike) {
+      setTicket((current) => ({
+        ...current,
+        trading_symbol: underlying ? `${underlying.replace(" ", "")}-${strike ?? "ATM"}-${option ?? "CE"}` : current.trading_symbol,
+        transaction_type: "B",
+        exchange_segment: "nse_fo",
+        order_type: "MKT",
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
     if (!ticket.price || !ticket.quantity) {
       setCharges(null);
       return;
