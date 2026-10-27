@@ -5,6 +5,29 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Bot,
+  BriefcaseBusiness,
+  ChevronDown,
+  ClipboardList,
+  FileChartColumn,
+  Gauge,
+  LayoutDashboard,
+  Menu,
+  Moon,
+  Network,
+  RefreshCw,
+  Search,
+  Settings,
+  SlidersHorizontal,
+  Sparkles,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import type { MarketStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -16,42 +39,42 @@ import { SessionChip, StatusChip } from "./ui";
 interface NavItem {
   href: string;
   label: string;
-  icon: string;
+  icon: LucideIcon;
 }
 
 const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Desk",
     items: [
-      { href: "/dashboard", label: "Overview", icon: "▦" },
-      { href: "/market", label: "Market watch", icon: "◫" },
-      { href: "/options", label: "Option chain", icon: "⋔" },
-      { href: "/portfolio", label: "Portfolio", icon: "◧" },
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+      { href: "/market", label: "Market watch", icon: TrendingUp },
+      { href: "/options", label: "Option chain", icon: SlidersHorizontal },
+      { href: "/portfolio", label: "Portfolio", icon: BriefcaseBusiness },
     ],
   },
   {
     group: "Trading",
     items: [
-      { href: "/trade", label: "Order ticket", icon: "⇅" },
-      { href: "/risk", label: "Risk", icon: "⚠" },
-      { href: "/paper", label: "Paper trading", icon: "◇" },
+      { href: "/trade", label: "Order ticket", icon: ClipboardList },
+      { href: "/risk", label: "Risk", icon: AlertTriangle },
+      { href: "/paper", label: "Paper trading", icon: Activity },
     ],
   },
   {
     group: "Quant",
     items: [
-      { href: "/strategies", label: "Strategies", icon: "⚙" },
-      { href: "/backtest", label: "Backtest", icon: "⟲" },
-      { href: "/analytics", label: "Analytics", icon: "◪" },
-      { href: "/coach", label: "AI coach", icon: "✦" },
+      { href: "/strategies", label: "Strategies", icon: Settings },
+      { href: "/backtest", label: "Backtest", icon: RefreshCw },
+      { href: "/analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/coach", label: "AI coach", icon: Bot },
     ],
   },
   {
     group: "System",
     items: [
-      { href: "/connect", label: "Broker connect", icon: "⇄" },
-      { href: "/alerts", label: "Alerts", icon: "◔" },
-      { href: "/settings", label: "Settings", icon: "⚒" },
+      { href: "/connect", label: "Broker connect", icon: Network },
+      { href: "/alerts", label: "Alerts", icon: AlertTriangle },
+      { href: "/settings", label: "Settings", icon: Settings },
     ],
   },
 ];
@@ -128,7 +151,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       }`}
                   >
                     <span aria-hidden className="w-4 text-center text-sm">
-                      {item.icon}
+                      <item.icon aria-hidden size={16} strokeWidth={1.5} />
                     </span>
                     {item.label}
                   </Link>
@@ -144,7 +167,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
       {/* ---------- top bar ---------- */}
-      <header className="sticky top-0 z-40 border-b border-hairline bg-surface/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-[#333333] bg-black/95 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-2.5">
           <button
             className="btn btn-sm btn-ghost lg:hidden"
@@ -160,6 +183,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="grid h-7 w-7 place-items-center rounded bg-accent text-sm font-bold text-white">A</span>
             <span className="hidden text-sm font-semibold tracking-tight sm:inline">AlphaTradePro</span>
           </Link>
+
+          <div className="mx-auto hidden w-full max-w-sm items-center gap-2 rounded-md border border-[#333333] bg-[#0A0A0A] px-3 py-1.5 text-xs text-[#888888] md:flex">
+            <Search aria-hidden size={15} strokeWidth={1.5} />
+            <span>Search markets, symbols, commands</span>
+            <kbd className="ml-auto rounded border border-[#333333] px-1.5 py-0.5 text-[10px] text-[#666666]">⌘K</kbd>
+          </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {status ? <SessionChip state={status.session.state} isOpen={status.session.is_open} /> : null}

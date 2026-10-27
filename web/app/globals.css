@@ -10,11 +10,11 @@
   html,
   body {
     height: 100%;
-    background: #080b12;
+    background: #000000;
   }
 
   body {
-    @apply bg-canvas text-ink font-sans antialiased;
+    @apply bg-black text-[#EDEDED] font-sans antialiased;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -61,7 +61,7 @@
 
 @layer components {
   .panel {
-    @apply rounded-lg border border-hairline bg-surface shadow-panel;
+    @apply rounded-md border border-[#333333] bg-[#0A0A0A];
   }
 
   .panel-head {
@@ -86,8 +86,8 @@
 
   .btn {
     @apply inline-flex select-none items-center justify-center gap-2 rounded-md border border-edge
-      bg-elevated px-3 py-2 text-2xs font-semibold uppercase tracking-wider text-ink
-      transition-colors duration-100 hover:border-ink-faint hover:bg-[#1B2433]
+      bg-[#171717] px-3 py-2 text-2xs font-semibold uppercase tracking-wider text-[#EDEDED]
+      transition-colors duration-100 hover:border-[#666666] hover:bg-[#1A1A1A]
       active:translate-y-px
       disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-edge disabled:hover:bg-elevated;
   }
@@ -95,10 +95,10 @@
     @apply border-transparent bg-accent text-white hover:bg-[#2F6FE4] hover:border-transparent;
   }
   .btn-buy {
-    @apply border-transparent bg-up font-bold text-black hover:bg-[#1DA851] hover:border-transparent;
+    @apply border-transparent bg-[#17C964] font-bold text-black hover:bg-[#20D978] hover:border-transparent;
   }
   .btn-sell {
-    @apply border-transparent bg-down font-bold text-white hover:bg-[#DC2626] hover:border-transparent;
+    @apply border-transparent bg-[#F31260] font-bold text-white hover:bg-[#ff2b73] hover:border-transparent;
   }
   .btn-ghost {
     @apply border-transparent bg-transparent hover:border-edge hover:bg-elevated;
@@ -150,11 +150,11 @@
     @apply w-full text-sm;
   }
   .tbl thead th {
-    @apply sticky top-0 z-10 border-b border-hairline bg-surface px-3 py-2 text-left
-      text-3xs font-semibold uppercase tracking-[0.1em] text-ink-faint;
+    @apply sticky top-0 z-10 border-b border-[#333333] bg-[#0A0A0A] px-3 py-2 text-left
+      text-xs font-semibold uppercase tracking-[0.1em] text-[#888888];
   }
   .tbl tbody td {
-    @apply border-b border-hairline/60 px-3 py-2;
+    @apply border-b border-[#333333]/70 px-3 py-2;
   }
   .tbl tbody tr:hover {
     @apply bg-elevated/60;
