@@ -23,6 +23,7 @@ from backend import app_bootstrap
 from backend.angel.auth import angel_session_manager
 from backend.angel.breadth import market_breadth_worker
 from backend.angel.feed import angel_feed
+from backend.ai.live_scanner import live_scanner
 from backend.api.routes import (
     admin_users,
     ai,
@@ -102,11 +103,20 @@ async def lifespan(app: FastAPI):
     try:
         market_feed.start()
     except Exception:  # noqa: BLE001
-        log.exception("Kotak Neo websocket feed failed to start; continuing without it")
+        log.exception("Kotak websocket feed failed to start; continuing without it")
+    try:
+        live_scanner.start()
+    except Exception:  # noqa: BLE001
+        log.exception("AI live scanner failed to start; continuing without it")
 
     yield
 
+
     log.info("Shutting down AlphaTradePro")
+    try:
+        live_scanner.stop()
+    except Exception:  # noqa: BLE001
+        log.exception("Error stopping the AI live scanner")
     try:
         market_feed.stop()
     except Exception:  # noqa: BLE001

@@ -421,6 +421,14 @@ CREATE TABLE IF NOT EXISTS candles (
     PRIMARY KEY (token, exchange_segment, interval, bucket)
 );
 CREATE INDEX IF NOT EXISTS idx_candles_lookup ON candles(token, exchange_segment, interval, bucket DESC);
+
+CREATE TABLE IF NOT EXISTS ai_live_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    underlying TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_live_signals_underlying ON ai_live_signals(underlying, created_at DESC);
 """
 
 

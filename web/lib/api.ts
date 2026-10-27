@@ -444,6 +444,17 @@ export interface CoachFinding {
   evidence?: unknown[];
 }
 
+export interface LiveAnalysis {
+  underlying: string;
+  signal: "BUY CE" | "BUY PE" | "WAIT";
+  strike: string;
+  confidence: string;
+  reason: string;
+  trend: "Bullish" | "Bearish" | "Unknown";
+  timestamp: number;
+  status: string;
+}
+
 export interface CoachResponse {
   has_data: boolean;
   disclaimer: string;
@@ -839,7 +850,9 @@ export const api = {
     get<CoachResponse>(`/api/v1/coach?mode=${mode}`),
 
   // AI
-  suggestTrade: () => get<Record<string, unknown>>("/api/v1/ai/suggest_trade"),
+  suggestTrade: () => get<LiveAnalysis>("/api/v1/ai/suggest_trade"),
+  liveAnalysis: (underlying = "NIFTY 50") =>
+    get<LiveAnalysis>(`/api/v1/ai/live-analysis?underlying=${encodeURIComponent(underlying)}`),
   executeOption: (body: Record<string, unknown>) => post<Record<string, unknown>>("/api/v1/orders/options", body),
   alerts: () => get<{ alerts: AlertRow[]; channels: Record<string, boolean> }>("/api/v1/alerts"),
   createAlert: (body: { kind: string; symbol?: string; condition: Record<string, unknown>; channels: string[] }) =>
