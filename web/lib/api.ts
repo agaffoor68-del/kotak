@@ -842,10 +842,10 @@ export const api = {
 
   // analytics
   performance: (mode: "paper" | "backtesting" = "paper") => get<PerformancePayload>(`/api/v1/analytics/performance?mode=${mode}`),
-  strategyAnalytics: () => get<StrategyRow[]>("/api/v1/analytics/strategies"),
-  performanceHeatmap: (days = 180) =>
+  strategyAnalytics: (mode: "paper" | "backtesting" = "paper") => get<StrategyRow[]>(`/api/v1/analytics/strategies?mode=${mode}`),
+  performanceHeatmap: (days = 180, mode: "paper" | "backtesting" = "paper") =>
     get<{ grid: Record<string, Record<string, number>>; weekdays: string[]; days: number }>(
-      `/api/v1/analytics/heatmap?days=${days}`,
+      `/api/v1/analytics/heatmap?mode=${mode}&days=${days}`,
     ),
   coach: (mode: "loss_analysis" | "strategy_suggestions" = "loss_analysis") =>
     get<CoachResponse>(`/api/v1/coach?mode=${mode}`),
