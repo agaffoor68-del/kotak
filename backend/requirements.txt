@@ -31,3 +31,5 @@ structlog>=24,<26
 # quotes, orders, instrument master), so no third-party SDK is imported and
 # none is needed. `smartapi-python` exists on PyPI, but adding it would only
 # be dead weight and another way for the Render build to fail.
+
+pandas_ta>=0.3.14b0

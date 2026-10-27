@@ -515,6 +515,29 @@ export interface AlertRow {
   triggered_at: number | null;
 }
 
+
+export interface CalculatedIndicatorResult {
+  symbol: string;
+  token: string;
+  timeframe: string;
+  indicator_name: string;
+  columns: string[];
+  values: ({ time: number; close?: number } & Record<string, number | null | undefined>)[];
+}
+
+export interface AvailableIndicatorInfo {
+  name: string;
+  category: string;
+  label: string;
+  params?: Record<string, unknown>;
+}
+
+export interface IndicatorCatalogResponse {
+  count: number;
+  popular: AvailableIndicatorInfo[];
+  indicators: AvailableIndicatorInfo[];
+}
+
 /* ------------------------------------------------------------------ routes */
 
 export interface PerformanceSummary {
@@ -693,6 +716,18 @@ export const api = {
   optionExpiries: (underlying: string) =>
     get<{ underlying: string; expiries: string[]; near: string | null; count: number }>(
       `/api/v1/options/expiries?underlying=${encodeURIComponent(underlying)}`,
+    ),
+
+  // indicators dynamic engine (100+ indicators via pandas_ta)
+  calculateIndicator: (body: {
+    symbol: string;
+    timeframe?: string;
+    indicator_name: string;
+    params?: Record<string, unknown>;
+  }) => post<CalculatedIndicatorResult>("/api/v1/indicators/calculate", body),
+  listDynamicIndicators: (category?: string) =>
+    get<IndicatorCatalogResponse>(
+      `/api/v1/indicators/list${category ? `?category=${encodeURIComponent(category)}` : ""}`,
     ),
 
   // strategies
