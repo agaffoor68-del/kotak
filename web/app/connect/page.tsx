@@ -139,7 +139,7 @@ function ConnectPanel({ onConnected }: { onConnected: () => void }) {
         </>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 w-full px-4">
         <Field label="Label" hint="Shown in the account list">
           <input className="field-input" value={form.label}
             onChange={(event) => set("label", event.target.value)} />
@@ -272,7 +272,7 @@ function AngelConnectPanel({ onConnected }: { onConnected: () => void }) {
         </>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 w-full px-4">
         <Field label="Label" hint="Shown in the account list">
           <input className="field-input" value={form.label}
             onChange={(event) => set("label", event.target.value)} />

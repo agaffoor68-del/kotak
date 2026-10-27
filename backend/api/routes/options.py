@@ -229,6 +229,12 @@ async def option_chain(
     token_to_quote_map, fetch_errors = await _fetch_quotes(user, unique_keys, underlying)
 
     if not token_to_quote_map:
+        joined = " ".join(fetch_errors).lower()
+        if "ab1010" in joined or "ab4033" in joined or "rate" in joined or "429" in joined:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={"error": "Rate limit exceeded, retry in 1 min"},
+            )
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"error": "Failed to fetch option quotes. Please check broker connection."},

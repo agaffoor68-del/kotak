@@ -309,16 +309,25 @@ def fetch(
     return candles
 
 
+_LEGACY_INDEX_TOKENS = {
+    "26000": "99926000",
+    "26009": "99919000",
+    "26037": "99926037",
+    "26074": "99926074",
+    "265": "99919000",
+}
+
 def _symbol_for(token: str, exchange_segment: str) -> tuple[str | None, bool]:
     """Return (broker_symbol, is_index) for the token.
 
     The broker symbol is the ``exch_seg:trading_symbol`` string SmartAPI wants
     in payloads. `is_index` tells callers whether to prefix the token with `999`.
     """
+    resolved = _LEGACY_INDEX_TOKENS.get(str(token), str(token))
     with app_cursor() as cursor:
         cursor.execute(
             "SELECT trading_symbol, is_index FROM instruments WHERE token = ? AND exchange_segment = ?",
-            (str(token), exchange_segment),
+            (resolved, exchange_segment),
         )
         row = cursor.fetchone()
     if row is None:

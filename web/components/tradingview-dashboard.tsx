@@ -126,9 +126,9 @@ export default function TradingViewDashboard() {
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* Left sidebar watchlist */}
-          <div className="w-[300px] border-r overflow-y-auto" style={{ borderColor: BORDER, background: PANEL }}>
+          <div className="w-full max-w-full md:w-[300px] border-r overflow-y-auto" style={{ borderColor: BORDER, background: PANEL }}>
             <div className="px-3 py-2 text-xs font-semibold" style={{ color: MUTED }}>Watchlist</div>
             {WATCHLIST.map((w) => {
               const q = feed.quotes[quoteKey(w.token, w.segment)];
@@ -152,7 +152,7 @@ export default function TradingViewDashboard() {
           </div>
 
           {/* Right execution panel */}
-          <div className="w-[320px] border-l p-3 text-xs" style={{ borderColor: BORDER, background: PANEL }}>
+          <div className="w-full max-w-full md:w-[320px] border-l p-3 text-xs" style={{ borderColor: BORDER, background: PANEL }}>
             <div className="mb-3 flex gap-2">
               <button onClick={() => setSide("BUY")} className="flex-1 rounded py-2 font-semibold" style={{ background: side === "BUY" ? GREEN : "#2a2e39", color: TEXT }}>BUY</button>
               <button onClick={() => setSide("SELL")} className="flex-1 rounded py-2 font-semibold" style={{ background: side === "SELL" ? RED : "#2a2e39", color: TEXT }}>SELL</button>

@@ -99,7 +99,7 @@ export function SharePanel() {
               style={{ imageRendering: "pixelated" }}
             />
           </div>
-          <p className="mt-1.5 max-w-[190px] text-center text-3xs leading-relaxed text-ink-faint">
+          <p className="mt-1.5 max-w-full text-center text-3xs leading-relaxed text-ink-faint">
             Point the phone camera at this
           </p>
         </div>
