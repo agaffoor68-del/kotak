@@ -9,7 +9,9 @@ export default function CoachPage() {
       <div className="space-y-4">
         <header>
           <h1 className="text-lg font-semibold tracking-tight">Live AI Market Analyzer</h1>
-          <p className="text-2xs text-ink-faint">Real-time NIFTY 50 analysis on each completed candle</p>
+          <p className="text-2xs text-ink-faint">
+            Multi-Index Confluence Engine & Self-Learning Memory (NIFTY 50 · BANKNIFTY · SENSEX)
+          </p>
         </header>
         <AiAdvisor />
       </div>

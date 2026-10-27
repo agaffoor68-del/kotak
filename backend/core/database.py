@@ -402,6 +402,19 @@ CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS AI_Trade_History (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    "index"              TEXT NOT NULL,
+    signal               TEXT NOT NULL,
+    entry_price          REAL NOT NULL,
+    exit_price           REAL,
+    pnl                  REAL,
+    indicators_at_entry  TEXT NOT NULL,
+    result               TEXT NOT NULL,
+    created_at           REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_trade_history_index_date ON AI_Trade_History("index", created_at DESC);
 """
 
 # -------------------------------------------------------------- market schema
@@ -448,6 +461,19 @@ CREATE TABLE IF NOT EXISTS ai_live_signals (
     created_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ai_live_signals_underlying ON ai_live_signals(underlying, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS AI_Trade_History (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    "index"              TEXT NOT NULL,
+    signal               TEXT NOT NULL,
+    entry_price          REAL NOT NULL,
+    exit_price           REAL,
+    pnl                  REAL,
+    indicators_at_entry  TEXT NOT NULL,
+    result               TEXT NOT NULL,
+    created_at           REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_trade_history_index_date ON AI_Trade_History("index", created_at DESC);
 """
 
 

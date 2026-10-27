@@ -445,12 +445,23 @@ export interface CoachFinding {
 }
 
 export interface LiveAnalysis {
+  index: string;
   underlying: string;
+  symbol: string;
   signal: "BUY CE" | "BUY PE" | "WAIT";
   strike: string;
+  strike_price?: number;
   confidence: string;
   reason: string;
   trend: "Bullish" | "Bearish" | "Unknown";
+  price?: number;
+  vwap?: number;
+  rsi?: number;
+  supertrend?: number;
+  ema20?: number;
+  ema50?: number;
+  confluence_score?: string;
+  avoiding_loss_pattern?: boolean;
   timestamp: number;
   status: string;
 }
@@ -852,8 +863,24 @@ export const api = {
 
   // AI
   suggestTrade: () => get<LiveAnalysis>("/api/v1/ai/suggest_trade"),
-  liveAnalysis: (underlying = "NIFTY 50") =>
-    get<LiveAnalysis>(`/api/v1/ai/live-analysis?underlying=${encodeURIComponent(underlying)}`),
+  liveAnalysis: (underlying?: string) =>
+    get<LiveAnalysis[] | LiveAnalysis>(
+      underlying ? `/api/v1/ai/live-analysis?underlying=${encodeURIComponent(underlying)}` : "/api/v1/ai/live-analysis"
+    ),
+  liveAnalysisMulti: () => get<LiveAnalysis[]>("/api/v1/ai/live-analysis"),
+  recordAiTrade: (body: {
+    index: string;
+    signal: string;
+    entry_price: number;
+    exit_price?: number;
+    pnl?: number;
+    indicators_at_entry?: Record<string, unknown>;
+    result: "WIN" | "LOSS";
+  }) => post<{ status: string; id: number }>("/api/v1/ai/trade-history", body),
+  aiTradeHistory: (index?: string) =>
+    get<Record<string, unknown>[]>(
+      index ? `/api/v1/ai/trade-history?index=${encodeURIComponent(index)}` : "/api/v1/ai/trade-history"
+    ),
   executeOption: (body: Record<string, unknown>) => post<Record<string, unknown>>("/api/v1/orders/options", body),
   alerts: () => get<{ alerts: AlertRow[]; channels: Record<string, boolean> }>("/api/v1/alerts"),
   createAlert: (body: { kind: string; symbol?: string; condition: Record<string, unknown>; channels: string[] }) =>
