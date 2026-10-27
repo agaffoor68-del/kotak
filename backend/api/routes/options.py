@@ -118,7 +118,7 @@ async def option_chain(
     exchange_segment: str = Query(default="nse_fo"),
     expiry: str | None = Query(default=None, description="ISO expiry date YYYY-MM-DD. If omitted, nearest future expiry is dynamically selected"),
     strike_type: str = Query(default="ATM", pattern="^(ITM|ATM|OTM)$", description="Strategy strike selection mode"),
-    offset: int = Query(default=15, ge=0, le=50, description="Number of strike intervals from ATM"),
+    offset: int = Query(default=10, ge=0, le=50, description="Number of strike intervals from ATM"),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, Any]:
     """Full option chain with OI, IV, Greeks, PCR, max pain and support/resistance.
@@ -183,17 +183,26 @@ async def option_chain(
     # Quote only a bounded window around ATM. The full master remains available,
     # while missing legs are safely ignored by build_chain.
     underlying_record = _find_index_for(underlying)
-    spot_quote = quote_engine.cached(underlying_record["token"], underlying_record["exchange_segment"]) if underlying_record else None
+    if not underlying_record:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": "Failed to fetch Spot Price. Please check broker connection."},
+        )
+
+    spot_quote = quote_engine.cached(underlying_record["token"], underlying_record["exchange_segment"])
     spot = spot_quote.last if spot_quote and spot_quote.last else None
     interval = strike_interval(underlying)
 
-    # The live spot decides where the strike window sits, so it is fetched
-    # before the window is computed rather than after. One extra quote
-    # request buys a chain that is actually centred on the money.
-    spot_token = str(underlying_record["token"]) if underlying_record else None
-    spot_segment = str(underlying_record["exchange_segment"]) if underlying_record else "nse_cm"
-    if spot is None and spot_token:
+    spot_token = str(underlying_record["token"])
+    spot_segment = str(underlying_record["exchange_segment"])
+    if spot is None:
         spot = await _fetch_spot(user, spot_token, spot_segment, underlying)
+
+    if spot is None:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": "Failed to fetch Spot Price. Please check broker connection."},
+        )
 
     available_strikes = sorted(float(value) for value in target_rows)
     selected_strikes = _strike_window(available_strikes, spot, interval, offset)
@@ -218,6 +227,12 @@ async def option_chain(
 
     # 4. Fetch live quotes via Angel One SmartAPI in batches of <= 50 tokens.
     token_to_quote_map, fetch_errors = await _fetch_quotes(user, unique_keys, underlying)
+
+    if not token_to_quote_map:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": "Failed to fetch option quotes. Please check broker connection."},
+        )
 
     def quote_lookup(token: str, segment: str):
         if not token:
@@ -378,6 +393,7 @@ async def _fetch_quotes(
         for attempt in (1, 2):
             try:
                 quotes = await asyncio.to_thread(angel_fetch, call, batch, "all")
+                log.info(f"Option Chain API Response: {quotes}")
             except Exception as error:  # noqa: BLE001 - one bad batch must not blank the chain
                 log.error("Option chain quote batch %s attempt %s failed for %s: %s", index // _QUOTE_BATCH + 1, attempt, underlying, error)
                 errors.append(f"batch {index // _QUOTE_BATCH + 1}: {error}")

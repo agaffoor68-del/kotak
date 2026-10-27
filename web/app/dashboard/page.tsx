@@ -249,15 +249,21 @@ export default function DashboardPage() {
               <span className="text-[10px]" style={{ color: MUTED }}>ATM Strike: {atm ?? "—"}</span>
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <div className="flex-1 rounded p-2 text-center" style={{ background: BG, border: `1px solid ${BORDER}` }}>
-                <div style={{ color: MUTED }} className="text-[10px]">ATM CE</div>
-                <div style={{ color: UP }} className="text-sm font-semibold">{num(ceLtp)}</div>
-              </div>
-              <div className="text-[10px] font-medium" style={{ color: MUTED }}>ATM</div>
-              <div className="flex-1 rounded p-2 text-center" style={{ background: BG, border: `1px solid ${BORDER}` }}>
-                <div style={{ color: MUTED }} className="text-[10px]">ATM PE</div>
-                <div style={{ color: DOWN }} className="text-sm font-semibold">{num(peLtp)}</div>
-              </div>
+              {chain ? (
+                <>
+                  <div className="flex-1 rounded p-2 text-center" style={{ background: BG, border: `1px solid ${BORDER}` }}>
+                    <div style={{ color: MUTED }} className="text-[10px]">ATM CE</div>
+                    <div style={{ color: UP }} className="text-sm font-semibold">{num(ceLtp)}</div>
+                  </div>
+                  <div className="text-[10px] font-medium" style={{ color: MUTED }}>ATM</div>
+                  <div className="flex-1 rounded p-2 text-center" style={{ background: BG, border: `1px solid ${BORDER}` }}>
+                    <div style={{ color: MUTED }} className="text-[10px]">ATM PE</div>
+                    <div style={{ color: DOWN }} className="text-sm font-semibold">{num(peLtp)}</div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 text-center text-[10px]" style={{ color: MUTED }}>Loading option chain...</div>
+              )}
             </div>
             <button
               onClick={() => router.push("/options")}
