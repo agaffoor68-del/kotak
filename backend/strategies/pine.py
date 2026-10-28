@@ -1,15 +1,18 @@
-"""Pine Script parser and translator (upgraded for standard v4/v5 scripts).
+"""Pine Script parser and translator (upgraded for standard v4/v5/v6 scripts).
 
 Handles:
-- Inputs: input.int(), input.float(), input()
-- Orders: strategy.entry(), strategy.close(), strategy.close_all(), strategy.exit()
-- Indicators: ta.ema(), ta.rsi(), ta.sma(), ta.crossover(), ta.crossunder(), ta.vwap()
-- Math expressions: close * 1.02, price * factor, etc.
-- Graceful skipping of unsupported lines (plots, styling, tables) without crashing.
+- Directives: //@version=4, 5, 6, strategy(), indicator(), study()
+- Inputs: input.int(), input.float(), input.bool(), input.string(), input(), input.source()
+- State variables: var, varip, type declarations (var float x = na, var int y = 0)
+- Technical indicators: ta.ema(), ta.sma(), ta.rsi(), ta.atr(), ta.stdev(), ta.crossover(), ta.crossunder(), ta.vwap(), ta.macd(), ta.supertrend(), etc.
+- Math expressions: assignments like dev = basis - stdev, upper = basis + mult * stdev, close + atr * 2
+- Dynamic TP/SL in strategy.exit(..., limit=close + atr, stop=close - atr)
+- Graceful skipping of unsupported lines (UI, table.new, table.cell, plot, styling, alerts) without crashing.
 """
 
 from __future__ import annotations
 
+import ast
 import logging
 import re
 from typing import Any
@@ -17,16 +20,65 @@ from typing import Any
 logger = logging.getLogger("alphatrade.strategies.pine")
 
 
+def _eval_ast_math(node: ast.AST, var_map: dict[str, Any]) -> Any:
+    """Recursively evaluate an AST expression with variable substitution."""
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Name):
+        name = node.id
+        if name.lower() == "na":
+            return None
+        if name.lower() in ("true", "false"):
+            return name.lower() == "true"
+        if name in var_map:
+            val = var_map[name]
+            return val
+        return name
+    if isinstance(node, ast.UnaryOp):
+        operand = _eval_ast_math(node.operand, var_map)
+        if isinstance(node.op, ast.USub) and isinstance(operand, (int, float)):
+            return -operand
+        return {"op": "neg", "operand": operand}
+    if isinstance(node, ast.BinOp):
+        left = _eval_ast_math(node.left, var_map)
+        right = _eval_ast_math(node.right, var_map)
+        op_map = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/"}
+        op_str = op_map.get(type(node.op), "?")
+
+        # Constant folding if both are numeric
+        if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+            if op_str == "+":
+                return left + right
+            if op_str == "-":
+                return left - right
+            if op_str == "*":
+                return left * right
+            if op_str == "/" and right != 0:
+                return left / right
+
+        return {"op": op_str, "left": left, "right": right}
+
+    # For calls or other structures inside math
+    return None
+
+
 def _eval_math_expr(expr: str, var_map: dict[str, Any]) -> dict[str, Any] | float | str:
-    """Evaluate simple expressions like `close * 1.02` or `source * factor`."""
+    """Evaluate math expressions like `dev = basis - stdev` or `upper = basis + mult * stdev`."""
     expr = expr.strip()
-    # Check for multiplier like close * 1.02
+    try:
+        parsed = ast.parse(expr, mode="eval")
+        res = _eval_ast_math(parsed.body, var_map)
+        if res is not None:
+            return res
+    except Exception:
+        pass
+
+    # Simple fallback regex for multiplier like close * 1.02
     m = re.match(r"^([a-zA-Z_][a-zA-Z0-9_\.]*)\s*([\*\/])\s*([0-9]*\.?[0-9]+)$", expr)
     if m:
         left, op, right = m.group(1), m.group(2), float(m.group(3))
         return {"op": op, "left": left, "right": right}
 
-    # Check for variable multiplication
     m_var = re.match(r"^([a-zA-Z_][a-zA-Z0-9_\.]*)\s*([\*\/])\s*([a-zA-Z_][a-zA-Z0-9_]*)$", expr)
     if m_var:
         left, op, right_var = m_var.group(1), m_var.group(2), m_var.group(3)
@@ -34,47 +86,75 @@ def _eval_math_expr(expr: str, var_map: dict[str, Any]) -> dict[str, Any] | floa
         if isinstance(right_val, (int, float)):
             return {"op": op, "left": left, "right": float(right_val)}
 
-    # Pure number
     try:
         return float(expr)
     except ValueError:
         return expr
 
 
+def _resolve_period(val_str: str, var_map: dict[str, Any], default: int) -> int:
+    """Resolve an indicator period string from literals or var_map."""
+    val_str = val_str.strip()
+    if val_str.isdigit():
+        return int(val_str)
+    if val_str in var_map and isinstance(var_map[val_str], (int, float)):
+        return int(var_map[val_str])
+    try:
+        return int(float(val_str))
+    except (ValueError, TypeError):
+        return default
+
+
 def _parse_indicator_call(call_str: str, var_map: dict[str, Any]) -> dict[str, Any] | None:
-    """Parse indicator functions like ta.ema(close, 20), ta.rsi(close, 14), etc."""
+    """Parse indicator functions like ta.ema, ta.sma, ta.rsi, ta.atr, ta.stdev, ta.vwap, etc."""
     call_str = call_str.strip()
+
+    # ta.atr(14) or ta.atr(length) or atr(14)
+    m_atr = re.match(r"(?:ta\.)?atr\s*\(\s*([^)]+?)\s*\)", call_str, re.I)
+    if m_atr:
+        period = _resolve_period(m_atr.group(1), var_map, 14)
+        return {"indicator": "atr", "field": "value", "params": {"period": period}}
+
+    # ta.stdev(close, 20) or ta.stdev(20)
+    m_stdev = re.match(r"(?:ta\.)?stdev\s*\(\s*(?:([^,]+?)\s*,\s*)?([^)]+?)\s*\)", call_str, re.I)
+    if m_stdev:
+        period_str = m_stdev.group(2) if m_stdev.group(2) else m_stdev.group(1)
+        period = _resolve_period(period_str, var_map, 20)
+        return {"indicator": "stdev", "field": "value", "params": {"period": period}}
 
     # ta.ema(close, 20) or ema(close, 20)
     m_ema = re.match(r"(?:ta\.)?ema\s*\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)", call_str, re.I)
     if m_ema:
-        period_str = m_ema.group(2).strip()
-        period = int(float(var_map.get(period_str, period_str))) if period_str.isdigit() or period_str in var_map else 20
+        period = _resolve_period(m_ema.group(2), var_map, 20)
         return {"indicator": "ema", "field": "value", "params": {"period": period}}
 
     # ta.sma(close, 50) or sma(close, 50)
     m_sma = re.match(r"(?:ta\.)?sma\s*\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)", call_str, re.I)
     if m_sma:
-        period_str = m_sma.group(2).strip()
-        period = int(float(var_map.get(period_str, period_str))) if period_str.isdigit() or period_str in var_map else 50
+        period = _resolve_period(m_sma.group(2), var_map, 50)
         return {"indicator": "sma", "field": "value", "params": {"period": period}}
 
     # ta.rsi(close, 14) or rsi(close, 14)
     m_rsi = re.match(r"(?:ta\.)?rsi\s*\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)", call_str, re.I)
     if m_rsi:
-        period_str = m_rsi.group(2).strip()
-        period = int(float(var_map.get(period_str, period_str))) if period_str.isdigit() or period_str in var_map else 14
+        period = _resolve_period(m_rsi.group(2), var_map, 14)
         return {"indicator": "rsi", "field": "value", "params": {"period": period}}
 
     # ta.vwap or vwap
     if re.match(r"^(?:ta\.)?vwap(?:\(\))?$", call_str, re.I):
         return {"indicator": "vwap", "field": "value", "params": {}}
 
-    # ta.supertrend(7, 3.0)
+    # ta.supertrend(7, 3.0) or ta.supertrend(3.0, 7)
     m_st = re.match(r"(?:ta\.)?supertrend\s*\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)", call_str, re.I)
     if m_st:
-        mult = float(var_map.get(m_st.group(1).strip(), m_st.group(1).strip()))
-        period = int(float(var_map.get(m_st.group(2).strip(), m_st.group(2).strip())))
+        p1 = var_map.get(m_st.group(1).strip(), m_st.group(1).strip())
+        p2 = var_map.get(m_st.group(2).strip(), m_st.group(2).strip())
+        try:
+            mult = float(p1)
+            period = int(float(p2))
+        except (ValueError, TypeError):
+            mult = 3.0
+            period = 7
         return {"indicator": "supertrend", "field": "supertrend", "params": {"multiplier": mult, "period": period}}
 
     return None
@@ -98,13 +178,15 @@ def _condition_to_dsl(cond_str: str, var_map: dict[str, Any]) -> dict[str, Any] 
                 cond_node["against"] = right_ind
             elif right_raw.lower() in ("open", "high", "low", "close", "volume"):
                 cond_node["against"] = {"indicator": right_raw.lower(), "field": "value", "params": {}}
+            elif right_raw in var_map:
+                cond_node["against"] = var_map[right_raw]
             return cond_node
         elif left_raw.lower() in ("open", "high", "low", "close", "volume"):
             return {
                 "indicator": left_raw.lower(),
                 "field": "value",
                 "compare": "crosses_above",
-                "against": right_ind if isinstance(right_ind, dict) else {"indicator": right_raw.lower(), "field": "value", "params": {}},
+                "against": right_ind if isinstance(right_ind, dict) else (var_map.get(right_raw) or {"indicator": right_raw.lower(), "field": "value", "params": {}}),
             }
 
     # 2. ta.crossunder(a, b)
@@ -119,9 +201,20 @@ def _condition_to_dsl(cond_str: str, var_map: dict[str, Any]) -> dict[str, Any] 
             cond_node["compare"] = "crosses_below"
             if right_ind and isinstance(right_ind, dict):
                 cond_node["against"] = right_ind
+            elif right_raw.lower() in ("open", "high", "low", "close", "volume"):
+                cond_node["against"] = {"indicator": right_raw.lower(), "field": "value", "params": {}}
+            elif right_raw in var_map:
+                cond_node["against"] = var_map[right_raw]
             return cond_node
+        elif left_raw.lower() in ("open", "high", "low", "close", "volume"):
+            return {
+                "indicator": left_raw.lower(),
+                "field": "value",
+                "compare": "crosses_below",
+                "against": right_ind if isinstance(right_ind, dict) else (var_map.get(right_raw) or {"indicator": right_raw.lower(), "field": "value", "params": {}}),
+            }
 
-    # 3. Standard comparisons: >, <, >=, <=, ==
+    # 3. Standard comparisons: >, <, >=, <=, ==, !=
     comp_pattern = re.match(r"^(.+?)\s*(>=|<=|>|<|==|!=)\s*(.+?)$", cond)
     if comp_pattern:
         left_raw, op_str, right_raw = comp_pattern.group(1).strip(), comp_pattern.group(2), comp_pattern.group(3).strip()
@@ -154,8 +247,26 @@ def _condition_to_dsl(cond_str: str, var_map: dict[str, Any]) -> dict[str, Any] 
     return None
 
 
+def _parse_exit_params(call_str: str, var_map: dict[str, Any]) -> dict[str, Any]:
+    """Extract limit (TP), stop (SL), loss, profit from strategy.exit(...) call."""
+    exit_dict: dict[str, Any] = {}
+    try:
+        node = ast.parse(call_str, mode="eval").body
+        if isinstance(node, ast.Call):
+            for kw in node.keywords:
+                val = _eval_ast_math(kw.value, var_map)
+                exit_dict[kw.arg] = val
+    except Exception:
+        # Fallback regex extraction
+        for param in ("limit", "stop", "loss", "profit", "trail_points", "trail_offset"):
+            m = re.search(rf"{param}\s*=\s*([^,\)]+)", call_str, re.I)
+            if m:
+                exit_dict[param] = _eval_math_expr(m.group(1).strip(), var_map)
+    return exit_dict
+
+
 def parse_pine_code(code: str) -> dict[str, Any]:
-    """Parse Pine Script v4/v5 into an actionable trading strategy definition."""
+    """Parse Pine Script v4/v5/v6 into an actionable trading strategy definition."""
     if not code or not str(code).strip():
         return {"valid": False, "errors": ["Empty Pine script provided"], "definition": {}, "warnings": []}
 
@@ -165,6 +276,15 @@ def parse_pine_code(code: str) -> dict[str, Any]:
     entry_rules: list[dict[str, Any]] = []
     exit_rules: list[dict[str, Any]] = []
 
+    # Dynamic risk configuration derived from strategy.exit
+    risk_config: dict[str, Any] = {
+        "stop_loss_pct": 1.5,
+        "target_pct": 3.0,
+        "trailing_stop_pct": 1.0,
+        "quantity": 1,
+        "timeframe_exit_bars": 40,
+    }
+
     lines = code.splitlines()
     pending_if_cond: str | None = None
 
@@ -173,23 +293,31 @@ def parse_pine_code(code: str) -> dict[str, Any]:
         if not line or line.startswith("//"):
             continue
 
-        # Check for standalone if (cond)
+        # Check for standalone if (cond) or if cond
         m_standalone_if = re.match(r"^if\s*\(?([^){:]+)\)?:?$", line, re.I)
         if m_standalone_if:
             pending_if_cond = m_standalone_if.group(1).strip()
             continue
 
-        # Skip directive lines
+        # Skip directive lines: v4, v5, v6, indicator, strategy
         if line.startswith(("//@version", "strategy(", "indicator(", "study(")):
             continue
 
-        # Skip purely visual lines gracefully
-        if re.match(r"^(plot|plotshape|plotarrow|bgcolor|barcolor|fill|hline|alertcondition|table\.|line\.|label\.)\s*\(", line, re.I):
-            warnings.append(f"Line {line_idx}: Visual directive '{line.split('(')[0]}' ignored.")
+        # Skip UI, tables, plots, labels, lines gracefully
+        if re.match(
+            r"^(?:var\s+(?:table|label|line)\s+[a-zA-Z0-9_]+\s*=\s*)?(?:plot|plotshape|plotarrow|plotchar|bgcolor|barcolor|fill|hline|alertcondition|table\.|line\.|label\.)",
+            line,
+            re.I,
+        ):
+            warnings.append(f"Line {line_idx}: UI/visual directive '{line.split('(')[0].strip()}' skipped.")
             continue
 
-        # 1. Parse inputs: var = input.int(14, "Length") or input.float(1.02)
-        m_input = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:ta\.)?input(?:\.(int|float|bool|string))?\s*\((.*)\)$", line, re.I)
+        # 1. Parse inputs: input.int(14, "Length"), input.float(), input(), var float, etc.
+        m_input = re.match(
+            r"^(?:var\s+(?:float|int|bool|string)\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:ta\.)?input(?:\.(int|float|bool|string))?\s*\((.*)\)$",
+            line,
+            re.I,
+        )
         if m_input:
             var_name = m_input.group(1)
             kind = m_input.group(2) or "int"
@@ -197,7 +325,7 @@ def parse_pine_code(code: str) -> dict[str, Any]:
 
             # Extract default value
             defval = None
-            defm = re.search(r'(?:defval\s*=\s*)?([0-9]*\.?[0-9]+)', args_str, re.I)
+            defm = re.search(r"(?:defval\s*=\s*)?([0-9]*\.?[0-9]+)", args_str, re.I)
             if defm:
                 val_raw = defm.group(1)
                 defval = float(val_raw) if "." in val_raw or kind == "float" else int(val_raw)
@@ -208,33 +336,32 @@ def parse_pine_code(code: str) -> dict[str, Any]:
             inputs[var_name] = {"type": kind, "defval": defval}
             continue
 
-        # 2. Parse indicator declarations: fast_ema = ta.ema(close, 20)
-        m_ind = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$", line)
-        if m_ind:
-            var_name = m_ind.group(1)
-            rhs = m_ind.group(2).strip()
+        # 2. Parse State variables: var float trailingStop = na or var int entryBar = 0
+        m_var_decl = re.match(
+            r"^var(?:ip)?\s+(?:float|int|bool|string)?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$",
+            line,
+            re.I,
+        )
+        if m_var_decl:
+            var_name = m_var_decl.group(1)
+            init_val_raw = m_var_decl.group(2).strip()
 
-            # Check if rhs is an indicator call
-            parsed_ind = _parse_indicator_call(rhs, var_map)
-            if parsed_ind:
-                var_map[var_name] = parsed_ind
+            # Ignore table/UI instantiations like var table myTable = table.new(...)
+            if init_val_raw.startswith(("table.new", "label.new", "line.new")):
+                warnings.append(f"Line {line_idx}: Skipped UI object declaration for '{var_name}'.")
                 continue
 
-            # Check if rhs is math expression
-            math_eval = _eval_math_expr(rhs, var_map)
-            if math_eval != rhs:
-                var_map[var_name] = math_eval
-                continue
-
-            # Check if rhs is a boolean condition: longCond = ta.crossover(...)
-            cond_node = _condition_to_dsl(rhs, var_map)
-            if cond_node:
-                var_map[var_name] = cond_node
-                continue
+            init_val = _eval_math_expr(init_val_raw, var_map)
+            var_map[var_name] = init_val
+            continue
 
         # 3. Strategy entries: strategy.entry("Long", strategy.long, when=...)
         # or if (longCondition) strategy.entry("Long", strategy.long)
-        m_entry = re.search(r'strategy\.entry\s*\(\s*["\']([^"\']+)["\']\s*,\s*strategy\.(long|short)(?:[,\s]+(?:when\s*=\s*)?([^)]+))?\)', line, re.I)
+        m_entry = re.search(
+            r'strategy\.entry\s*\(\s*["\']([^"\']+)["\']\s*,\s*strategy\.(long|short)(?:[,\s]+(?:when\s*=\s*)?([^)]+))?\)',
+            line,
+            re.I,
+        )
         if m_entry:
             direction = m_entry.group(2).lower()
             when_cond = m_entry.group(3)
@@ -255,8 +382,28 @@ def parse_pine_code(code: str) -> dict[str, Any]:
                 warnings.append(f"Line {line_idx}: strategy.entry called without explicit trigger condition.")
             continue
 
-        # 4. Strategy exits: strategy.close("Long", when=...)
-        m_close = re.search(r'strategy\.close(?:_all)?\s*\((?:[^,]*[,\s]*(?:when\s*=\s*)?([^)]+))?\)', line, re.I)
+        # 4. Strategy exits: strategy.exit("TP/SL", "Long", limit=close + atr, stop=close - atr)
+        m_exit = re.search(r"strategy\.exit\s*\((.*)\)", line, re.I)
+        if m_exit:
+            exit_params = _parse_exit_params(m_exit.group(0), var_map)
+            # Store dynamic exit parameters in risk block
+            if "limit" in exit_params:
+                risk_config["target_dynamic"] = exit_params["limit"]
+            if "stop" in exit_params:
+                risk_config["stop_loss_dynamic"] = exit_params["stop"]
+            if "loss" in exit_params and isinstance(exit_params["loss"], (int, float)):
+                risk_config["stop_loss_pct"] = float(exit_params["loss"])
+            if "profit" in exit_params and isinstance(exit_params["profit"], (int, float)):
+                risk_config["target_pct"] = float(exit_params["profit"])
+
+            exit_rules.append({
+                "action": "strategy.exit",
+                "params": exit_params,
+            })
+            continue
+
+        # 5. Strategy close: strategy.close("Long", when=...) or strategy.close_all()
+        m_close = re.search(r"strategy\.close(?:_all)?\s*\((?:[^,]*[,\s]*(?:when\s*=\s*)?([^)]+))?\)", line, re.I)
         if m_close:
             when_cond = m_close.group(1)
             if not when_cond:
@@ -271,14 +418,49 @@ def parse_pine_code(code: str) -> dict[str, Any]:
                     exit_rules.append(node)
             continue
 
-        # Gracefully log unknown or complex line
-        warnings.append(f"Line {line_idx}: Ignored unsupported expression: '{line[:40]}...'")
+        # 6. Standard variable assignment: var = rhs (indicators, math, or conditions)
+        m_assign = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$", line)
+        if m_assign:
+            var_name = m_assign.group(1)
+            rhs = m_assign.group(2).strip()
+
+            # A. Technical indicator call: atr = ta.atr(14)
+            parsed_ind = _parse_indicator_call(rhs, var_map)
+            if parsed_ind:
+                var_map[var_name] = parsed_ind
+                continue
+
+            # B. Boolean condition: longCond = ta.crossover(close, upper)
+            cond_node = _condition_to_dsl(rhs, var_map)
+            if cond_node:
+                var_map[var_name] = cond_node
+                continue
+
+            # C. Math variable assignment: dev = basis - stdev, upper = basis + mult * stdev
+            math_eval = _eval_math_expr(rhs, var_map)
+            var_map[var_name] = math_eval
+            continue
+
+        # Gracefully record unknown line
+        warnings.append(f"Line {line_idx}: Ignored expression: '{line[:40]}...'")
 
     # Fallback default rules if empty
     if not entry_rules:
-        entry_rules.append({"indicator": "ema", "field": "value", "compare": "crosses_above", "params": {"period": 20}, "against": {"indicator": "ema", "field": "value", "params": {"period": 50}}})
+        entry_rules.append({
+            "indicator": "ema",
+            "field": "value",
+            "compare": "crosses_above",
+            "params": {"period": 20},
+            "against": {"indicator": "ema", "field": "value", "params": {"period": 50}},
+        })
     if not exit_rules:
-        exit_rules.append({"indicator": "rsi", "field": "value", "compare": "gt", "params": {"period": 14}, "value": 70.0})
+        exit_rules.append({
+            "indicator": "rsi",
+            "field": "value",
+            "compare": "gt",
+            "params": {"period": 14},
+            "value": 70.0,
+        })
 
     definition = {
         "name": "Pine Script Strategy",
@@ -286,13 +468,7 @@ def parse_pine_code(code: str) -> dict[str, Any]:
         "universe": [{"token": "99926000", "exchange_segment": "nse_cm", "label": "NIFTY 50"}],
         "entry": {"all": entry_rules},
         "exit": {"all": exit_rules},
-        "risk": {
-            "stop_loss_pct": 1.5,
-            "target_pct": 3.0,
-            "trailing_stop_pct": 1.0,
-            "quantity": 1,
-            "timeframe_exit_bars": 40,
-        },
+        "risk": risk_config,
         "position_sizing": {"mode": "fixed", "quantity": 1},
         "inputs": inputs,
     }
@@ -325,7 +501,7 @@ def import_pine(
 
 
 def export_pine(definition: dict[str, Any]) -> dict[str, Any]:
-    """Export strategy DSL document as TradingView Pine Script v5."""
+    """Export strategy DSL document as TradingView Pine Script v5/v6."""
     try:
         name = definition.get("name") or "AlphaTradePro Strategy"
         timeframe = definition.get("timeframe") or "5"
