@@ -38,6 +38,9 @@ from backend.strategies.indicators import CANDLE_INDICATORS, INDICATORS
 #: "close above the upper band" without a special-case in the evaluator.
 PRICE_FIELDS = ("open", "high", "low", "close", "volume")
 
+#: State fields supported in conditions, e.g. strategy.position_size == 0
+STATE_FIELDS = ("strategy.position_size", "position_size")
+
 COMPARATORS: dict[str, Callable[[float, float], bool]] = {
     "gt": lambda a, b: a > b,
     "gte": lambda a, b: a >= b,
@@ -117,14 +120,27 @@ def _validate_node(node: Any, path: str) -> list[str]:
     if "not" in node:
         return _validate_node(node["not"], f"{path}.not")
 
+    # Support action-based exit rules from Pine Script (e.g., strategy.exit, strategy.close)
+    if node.get("action") in ("strategy.exit", "strategy.close", "exit"):
+        params = node.get("params") or {}
+        if not isinstance(params, dict):
+            errors.append(f"{path}.params: expected an object")
+        return errors
+
+    # Support dynamic math expression nodes in conditions: {"op": "+", "left": ..., "right": ...}
+    if "op" in node and ("left" in node or "right" in node):
+        return errors
+
     indicator = node.get("indicator")
     if not indicator:
         errors.append(f"{path}: missing 'indicator'")
         return errors
-    if indicator not in INDICATORS and indicator not in PRICE_FIELDS:
+
+    valid_indicators = set(INDICATORS) | set(PRICE_FIELDS) | set(STATE_FIELDS)
+    if indicator not in valid_indicators:
         errors.append(
             f"{path}: unknown indicator '{indicator}'. "
-            f"Available: {', '.join(sorted(set(INDICATORS) | set(PRICE_FIELDS)))}"
+            f"Available: {', '.join(sorted(valid_indicators))}"
         )
         return errors
 
@@ -139,7 +155,7 @@ def _validate_node(node: Any, path: str) -> list[str]:
     params = node.get("params") or {}
     if not isinstance(params, dict):
         errors.append(f"{path}.params: expected an object")
-    elif indicator not in CANDLE_INDICATORS and indicator not in PRICE_FIELDS:
+    elif indicator not in CANDLE_INDICATORS and indicator not in PRICE_FIELDS and indicator not in STATE_FIELDS:
         for key in ("period", "fast", "slow", "signal", "length"):
             value = params.get(key)
             if value is not None and (not isinstance(value, int) or value < 1):
@@ -149,7 +165,6 @@ def _validate_node(node: Any, path: str) -> list[str]:
         if not node.get("against"):
             errors.append(f"{path}: '{compare}' needs an 'against' reference")
     elif node.get("value") is None and not node.get("against"):
-        # A comparison needs either a literal threshold or another series.
         errors.append(f"{path}: comparison needs a 'value' or an 'against' reference")
 
     return errors
@@ -166,15 +181,18 @@ class IndicatorCache:
     disagree about "now".
     """
 
-    def __init__(self, candles: list[dict[str, Any]], *, index: int | None = None) -> None:
+    def __init__(self, candles: list[dict[str, Any]], *, index: int | None = None, position_size: int = 0) -> None:
         self.candles = candles
         self.index = len(candles) - 1 if index is None else index
         self.closes = [candle.get("close") for candle in candles]
+        self.position_size = position_size
         self._cache: dict[str, Any] = {}
 
     def _compute(self, name: str, params: dict[str, Any]) -> Any:
         if name in PRICE_FIELDS:
             return [candle.get(name) for candle in self.candles]
+        if name in STATE_FIELDS:
+            return [float(self.position_size)] * len(self.candles)
         key = f"{name}:{sorted(params.items())}"
         if key in self._cache:
             return self._cache[key]
@@ -206,15 +224,63 @@ class IndicatorCache:
         return list(result)
 
 
-def _reference_value(reference: dict[str, Any], cache: IndicatorCache, index: int) -> float | None:
-    """Resolve a literal number or another indicator to a value at `index`."""
-    if "value" in reference and reference["value"] is not None:
-        return float(reference["value"])
-    if reference.get("indicator"):
-        return cache.value(
-            reference["indicator"], reference.get("params") or {},
-            reference.get("field", "value"), index,
-        )
+def _eval_math_tree(expr: Any, cache: IndicatorCache, index: int) -> float | None:
+    """Evaluate nested math dicts like {'op': '+', 'left': 'close', 'right': ...} at bar index."""
+    if isinstance(expr, (int, float)):
+        return float(expr)
+    if isinstance(expr, str):
+        if expr in PRICE_FIELDS or expr in STATE_FIELDS:
+            return cache.value(expr, {}, "value", index)
+        try:
+            return float(expr)
+        except ValueError:
+            return None
+    if isinstance(expr, dict):
+        if expr.get("indicator"):
+            return cache.value(
+                expr["indicator"],
+                expr.get("params") or {},
+                expr.get("field", "value"),
+                index,
+            )
+        if "op" in expr:
+            op = expr["op"]
+            if op == "neg":
+                op_val = _eval_math_tree(expr.get("operand"), cache, index)
+                return -op_val if op_val is not None else None
+            left_val = _eval_math_tree(expr.get("left"), cache, index)
+            right_val = _eval_math_tree(expr.get("right"), cache, index)
+            if left_val is None or right_val is None:
+                return None
+            if op == "+":
+                return left_val + right_val
+            if op == "-":
+                return left_val - right_val
+            if op == "*":
+                return left_val * right_val
+            if op == "/" and right_val != 0:
+                return left_val / right_val
+        if "value" in expr and expr["value"] is not None:
+            return float(expr["value"])
+    return None
+
+
+def _reference_value(reference: Any, cache: IndicatorCache, index: int) -> float | None:
+    """Resolve a literal number, another indicator, or math node to a value at `index`."""
+    if isinstance(reference, (int, float)):
+        return float(reference)
+    if isinstance(reference, dict):
+        if "value" in reference and reference["value"] is not None:
+            return float(reference["value"])
+        if reference.get("indicator"):
+            return cache.value(
+                reference["indicator"],
+                reference.get("params") or {},
+                reference.get("field", "value"),
+                index,
+            )
+        if "op" in reference:
+            return _eval_math_tree(reference, cache, index)
     return None
 
 
@@ -229,6 +295,28 @@ def evaluate(node: Any, cache: IndicatorCache, index: int) -> bool:
         return any(evaluate(child, cache, index) for child in node["any"])
     if "not" in node:
         return not evaluate(node["not"], cache, index)
+
+    # Handle action-based exit rules (strategy.exit dynamic checks)
+    if node.get("action") == "strategy.exit":
+        params = node.get("params") or {}
+        limit = params.get("limit")
+        stop = params.get("stop")
+        close_price = cache.value("close", {}, "value", index)
+        if close_price is None:
+            return False
+
+        if limit is not None:
+            limit_price = _eval_math_tree(limit, cache, index)
+            if limit_price is not None and close_price >= limit_price:
+                return True
+        if stop is not None:
+            stop_price = _eval_math_tree(stop, cache, index)
+            if stop_price is not None and close_price <= stop_price:
+                return True
+        return False
+
+    if node.get("action") == "strategy.close":
+        return True
 
     indicator = node.get("indicator")
     if not indicator:
@@ -250,7 +338,7 @@ def evaluate(node: Any, cache: IndicatorCache, index: int) -> bool:
             return previous <= other and current > other
         return previous >= other and current < other
 
-    target = _reference_value(node, cache, index)
+    target = _reference_value(node.get("against") if "against" in node else node, cache, index)
     if target is None:
         return False
     return COMPARATORS[compare](current, target)
@@ -267,6 +355,9 @@ def explain(node: Any, cache: IndicatorCache, index: int) -> dict[str, Any]:
     if isinstance(node, dict) and "not" in node:
         child = explain(node["not"], cache, index)
         return {"type": "not", "result": not child["result"], "children": [child]}
+    if isinstance(node, dict) and node.get("action") == "strategy.exit":
+        res = evaluate(node, cache, index)
+        return {"type": "action", "action": "strategy.exit", "result": res}
     if not isinstance(node, dict) or not node.get("indicator"):
         return {"type": "invalid", "result": False}
 

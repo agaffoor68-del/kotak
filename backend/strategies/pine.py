@@ -4,7 +4,9 @@ Handles:
 - Directives: //@version=4, 5, 6, strategy(), indicator(), study()
 - Inputs: input.int(), input.float(), input.bool(), input.string(), input(), input.source()
 - State variables: var, varip, type declarations (var float x = na, var int y = 0)
+- Variable reassignments: `x := expr`
 - Technical indicators: ta.ema(), ta.sma(), ta.rsi(), ta.atr(), ta.stdev(), ta.crossover(), ta.crossunder(), ta.vwap(), ta.macd(), ta.supertrend(), etc.
+- State conditions: strategy.position_size == 0, strategy.position_size > 0
 - Math expressions: assignments like dev = basis - stdev, upper = basis + mult * stdev, close + atr * 2
 - Dynamic TP/SL in strategy.exit(..., limit=close + atr, stop=close - atr)
 - Graceful skipping of unsupported lines (UI, table.new, table.cell, plot, styling, alerts) without crashing.
@@ -34,6 +36,12 @@ def _eval_ast_math(node: ast.AST, var_map: dict[str, Any]) -> Any:
             val = var_map[name]
             return val
         return name
+    if isinstance(node, ast.Attribute):
+        # Attribute access like strategy.position_size
+        full_name = f"{node.value.id}.{node.attr}" if isinstance(node.value, ast.Name) else node.attr
+        if full_name in var_map:
+            return var_map[full_name]
+        return full_name
     if isinstance(node, ast.UnaryOp):
         operand = _eval_ast_math(node.operand, var_map)
         if isinstance(node.op, ast.USub) and isinstance(operand, (int, float)):
@@ -58,7 +66,6 @@ def _eval_ast_math(node: ast.AST, var_map: dict[str, Any]) -> Any:
 
         return {"op": op_str, "left": left, "right": right}
 
-    # For calls or other structures inside math
     return None
 
 
@@ -109,7 +116,7 @@ def _parse_indicator_call(call_str: str, var_map: dict[str, Any]) -> dict[str, A
     """Parse indicator functions like ta.ema, ta.sma, ta.rsi, ta.atr, ta.stdev, ta.vwap, etc."""
     call_str = call_str.strip()
 
-    # ta.atr(14) or ta.atr(length) or atr(14)
+    # ta.atr(14) or ta.atr(length)
     m_atr = re.match(r"(?:ta\.)?atr\s*\(\s*([^)]+?)\s*\)", call_str, re.I)
     if m_atr:
         period = _resolve_period(m_atr.group(1), var_map, 14)
@@ -140,11 +147,11 @@ def _parse_indicator_call(call_str: str, var_map: dict[str, Any]) -> dict[str, A
         period = _resolve_period(m_rsi.group(2), var_map, 14)
         return {"indicator": "rsi", "field": "value", "params": {"period": period}}
 
-    # ta.vwap or vwap
+    # ta.vwap
     if re.match(r"^(?:ta\.)?vwap(?:\(\))?$", call_str, re.I):
         return {"indicator": "vwap", "field": "value", "params": {}}
 
-    # ta.supertrend(7, 3.0) or ta.supertrend(3.0, 7)
+    # ta.supertrend(7, 3.0)
     m_st = re.match(r"(?:ta\.)?supertrend\s*\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)", call_str, re.I)
     if m_st:
         p1 = var_map.get(m_st.group(1).strip(), m_st.group(1).strip())
@@ -214,12 +221,26 @@ def _condition_to_dsl(cond_str: str, var_map: dict[str, Any]) -> dict[str, Any] 
                 "against": right_ind if isinstance(right_ind, dict) else (var_map.get(right_raw) or {"indicator": right_raw.lower(), "field": "value", "params": {}}),
             }
 
-    # 3. Standard comparisons: >, <, >=, <=, ==, !=
+    # 3. Standard comparisons: >, <, >=, <=, ==, != (including strategy.position_size == 0)
     comp_pattern = re.match(r"^(.+?)\s*(>=|<=|>|<|==|!=)\s*(.+?)$", cond)
     if comp_pattern:
         left_raw, op_str, right_raw = comp_pattern.group(1).strip(), comp_pattern.group(2), comp_pattern.group(3).strip()
         op_map = {">": "gt", ">=": "gte", "<": "lt", "<=": "lte", "==": "eq", "!=": "neq"}
         compare_op = op_map.get(op_str, "gt")
+
+        # State condition: strategy.position_size == 0
+        if left_raw.lower() in ("strategy.position_size", "position_size"):
+            right_eval = _eval_math_expr(right_raw, var_map)
+            node = {
+                "indicator": "strategy.position_size",
+                "field": "value",
+                "compare": compare_op,
+            }
+            if isinstance(right_eval, (int, float)):
+                node["value"] = float(right_eval)
+            elif isinstance(right_eval, dict):
+                node["against"] = right_eval
+            return node
 
         left_ind = var_map.get(left_raw) or _parse_indicator_call(left_raw, var_map)
         right_eval = _eval_math_expr(right_raw, var_map)
@@ -257,7 +278,6 @@ def _parse_exit_params(call_str: str, var_map: dict[str, Any]) -> dict[str, Any]
                 val = _eval_ast_math(kw.value, var_map)
                 exit_dict[kw.arg] = val
     except Exception:
-        # Fallback regex extraction
         for param in ("limit", "stop", "loss", "profit", "trail_points", "trail_offset"):
             m = re.search(rf"{param}\s*=\s*([^,\)]+)", call_str, re.I)
             if m:
@@ -276,7 +296,6 @@ def parse_pine_code(code: str) -> dict[str, Any]:
     entry_rules: list[dict[str, Any]] = []
     exit_rules: list[dict[str, Any]] = []
 
-    # Dynamic risk configuration derived from strategy.exit
     risk_config: dict[str, Any] = {
         "stop_loss_pct": 1.5,
         "target_pct": 3.0,
@@ -303,9 +322,9 @@ def parse_pine_code(code: str) -> dict[str, Any]:
         if line.startswith(("//@version", "strategy(", "indicator(", "study(")):
             continue
 
-        # Skip UI, tables, plots, labels, lines gracefully
+        # Skip UI, tables, plots, labels, lines gracefully (e.g. table.cell, table.new)
         if re.match(
-            r"^(?:var\s+(?:table|label|line)\s+[a-zA-Z0-9_]+\s*=\s*)?(?:plot|plotshape|plotarrow|plotchar|bgcolor|barcolor|fill|hline|alertcondition|table\.|line\.|label\.)",
+            r"^(?:var\s+(?:table|label|line)\s+[a-zA-Z0-9_]+\s*[:=]+\s*)?(?:plot|plotshape|plotarrow|plotchar|bgcolor|barcolor|fill|hline|alertcondition|table\.|line\.|label\.)",
             line,
             re.I,
         ):
@@ -314,7 +333,7 @@ def parse_pine_code(code: str) -> dict[str, Any]:
 
         # 1. Parse inputs: input.int(14, "Length"), input.float(), input(), var float, etc.
         m_input = re.match(
-            r"^(?:var\s+(?:float|int|bool|string)\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:ta\.)?input(?:\.(int|float|bool|string))?\s*\((.*)\)$",
+            r"^(?:var\s+(?:float|int|bool|string)\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*[:=]+\s*(?:ta\.)?input(?:\.(int|float|bool|string))?\s*\((.*)\)$",
             line,
             re.I,
         )
@@ -323,7 +342,6 @@ def parse_pine_code(code: str) -> dict[str, Any]:
             kind = m_input.group(2) or "int"
             args_str = m_input.group(3)
 
-            # Extract default value
             defval = None
             defm = re.search(r"(?:defval\s*=\s*)?([0-9]*\.?[0-9]+)", args_str, re.I)
             if defm:
@@ -336,9 +354,12 @@ def parse_pine_code(code: str) -> dict[str, Any]:
             inputs[var_name] = {"type": kind, "defval": defval}
             continue
 
-        # 2. Parse State variables: var float trailingStop = na or var int entryBar = 0
+        # 2. Parse State variables and reassignments:
+        #    var float trailingStop = na
+        #    var int entryBar = 0
+        #    trailingStop := close + 10
         m_var_decl = re.match(
-            r"^var(?:ip)?\s+(?:float|int|bool|string)?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$",
+            r"^var(?:ip)?\s+(?:float|int|bool|string)?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*[:=]+\s*(.+)$",
             line,
             re.I,
         )
@@ -346,7 +367,6 @@ def parse_pine_code(code: str) -> dict[str, Any]:
             var_name = m_var_decl.group(1)
             init_val_raw = m_var_decl.group(2).strip()
 
-            # Ignore table/UI instantiations like var table myTable = table.new(...)
             if init_val_raw.startswith(("table.new", "label.new", "line.new")):
                 warnings.append(f"Line {line_idx}: Skipped UI object declaration for '{var_name}'.")
                 continue
@@ -355,8 +375,27 @@ def parse_pine_code(code: str) -> dict[str, Any]:
             var_map[var_name] = init_val
             continue
 
+        # Variable reassignment: `var_name := rhs`
+        m_reassign = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*:=\s*(.+)$", line)
+        if m_reassign:
+            var_name = m_reassign.group(1)
+            rhs = m_reassign.group(2).strip()
+
+            parsed_ind = _parse_indicator_call(rhs, var_map)
+            if parsed_ind:
+                var_map[var_name] = parsed_ind
+                continue
+
+            cond_node = _condition_to_dsl(rhs, var_map)
+            if cond_node:
+                var_map[var_name] = cond_node
+                continue
+
+            math_eval = _eval_math_expr(rhs, var_map)
+            var_map[var_name] = math_eval
+            continue
+
         # 3. Strategy entries: strategy.entry("Long", strategy.long, when=...)
-        # or if (longCondition) strategy.entry("Long", strategy.long)
         m_entry = re.search(
             r'strategy\.entry\s*\(\s*["\']([^"\']+)["\']\s*,\s*strategy\.(long|short)(?:[,\s]+(?:when\s*=\s*)?([^)]+))?\)',
             line,
@@ -386,7 +425,6 @@ def parse_pine_code(code: str) -> dict[str, Any]:
         m_exit = re.search(r"strategy\.exit\s*\((.*)\)", line, re.I)
         if m_exit:
             exit_params = _parse_exit_params(m_exit.group(0), var_map)
-            # Store dynamic exit parameters in risk block
             if "limit" in exit_params:
                 risk_config["target_dynamic"] = exit_params["limit"]
             if "stop" in exit_params:

@@ -288,6 +288,25 @@ def stochastic(candles: Candles, period: int = 14, smooth: int = 3) -> dict[str,
 
 
 # ------------------------------------------------------------------ volatility
+def stdev(values: Sequence[Number], period: int = 20) -> Series:
+    """Standard deviation over rolling window."""
+    if period <= 0:
+        raise ValueError("period must be positive")
+    middle = sma(values, period)
+    out: Series = [None] * len(values)
+    for index in range(len(values)):
+        if index < period - 1:
+            continue
+        window = [v for v in values[index - period + 1: index + 1] if v is not None]
+        if len(window) < period:
+            continue
+        mean = middle[index]
+        if mean is None:
+            continue
+        variance = sum((value - mean) ** 2 for value in window) / period
+        out[index] = math.sqrt(variance)
+    return out
+
 
 
 def bollinger(values: Sequence[Number], period: int = 20, deviations: float = 2.0) -> dict[str, Series]:
@@ -550,6 +569,7 @@ INDICATORS: dict[str, Callable] = {
     "rsi": rsi,
     "macd": macd,
     "bollinger": bollinger,
+    "stdev": stdev,
     "atr": atr_series,
     "adx": adx,
     "stochastic_rsi": stochastic_rsi,
@@ -561,7 +581,7 @@ INDICATORS: dict[str, Callable] = {
 }
 
 #: Indicators taking candles rather than a price series.
-CANDLE_INDICATORS = {"vwap", "supertrend", "adx", "stochastic", "ichimoku", "obv", "cmf", "volume_profile"}
+CANDLE_INDICATORS = {"atr", "vwap", "supertrend", "adx", "stochastic", "ichimoku", "obv", "cmf", "volume_profile"}
 
 
 def available() -> list[dict[str, str]]:
@@ -578,7 +598,7 @@ def available() -> list[dict[str, str]]:
 def _outputs(name: str) -> str:
     return {
         "sma": "value", "ema": "value", "wma": "value", "rsi": "value", "atr": "value", "vwap": "value",
-        "macd": "macd,signal,histogram", "bollinger": "upper,middle,lower",
+        "macd": "macd,signal,histogram", "bollinger": "upper,middle,lower", "stdev": "value",
         "supertrend": "supertrend,upper,lower", "adx": "adx,plus_di,minus_di",
         "stochastic_rsi": "k,d", "stochastic": "k,d",
         "ichimoku": "tenkan,kijun,senkou_a,senkou_b,chikou",

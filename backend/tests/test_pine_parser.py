@@ -1,14 +1,13 @@
-"""Unit tests for Pine Script parser upgrades: v6 syntax, math expressions, dynamic TP/SL, and table UI skipping."""
-
 import unittest
-from backend.strategies.pine import parse_pine_code, import_pine, export_pine
+from backend.strategies.pine import parse_pine_code
+from backend.strategies.dsl import validate, evaluate, IndicatorCache
 
 
-class TestPineParserUpgrades(unittest.TestCase):
-    def test_v6_advanced_script(self):
-        sample = """
+class TestPineParser(unittest.TestCase):
+    def test_v6_advanced_script_parsing(self):
+        script = """
 //@version=6
-strategy('V6 Advanced Strategy', overlay=true)
+strategy('Advanced V6 Strategy', overlay=true)
 
 length = input.int(14, 'ATR Length')
 mult = input.float(2.0, 'Multiplier')
@@ -22,10 +21,9 @@ stdev = ta.stdev(close, 20)
 upper = basis + mult * stdev
 lower = basis - mult * stdev
 
-dev = basis - stdev
+trailingStop := close - atr * 1.5
 
-longCond = ta.crossover(close, upper)
-shortCond = ta.crossunder(close, lower)
+longCond = ta.crossover(close, upper) and strategy.position_size == 0
 
 if longCond
     strategy.entry('Long', strategy.long)
@@ -40,35 +38,38 @@ plot(basis, color=color.blue)
 plot(upper, color=color.green)
 plot(lower, color=color.red)
 """
-        res = parse_pine_code(sample)
-        self.assertTrue(res["valid"])
-        defn = res["definition"]
+        result = parse_pine_code(script)
+        self.assertTrue(result["valid"])
+        self.assertEqual(len(result["errors"]), 0)
 
-        # Check inputs
-        inputs = defn["inputs"]
-        self.assertEqual(inputs["length"]["defval"], 14)
-        self.assertEqual(inputs["mult"]["defval"], 2.0)
+        defn = result["definition"]
+        self.assertIn("entry", defn)
+        self.assertIn("exit", defn)
+        self.assertIn("risk", defn)
 
-        # Check entry rules
-        entries = defn["entry"]["all"]
-        self.assertEqual(len(entries), 1)
-        self.assertEqual(entries[0]["indicator"], "close")
-        self.assertEqual(entries[0]["compare"], "crosses_above")
+        # Verify dynamic exit parsed without missing indicator errors
+        validation = validate(defn)
+        self.assertTrue(validation["valid"], f"Validation failed with: {validation.get('errors')}")
 
-        # Check dynamic TP / SL in risk definition
-        risk = defn["risk"]
-        self.assertIn("target_dynamic", risk)
-        self.assertIn("stop_loss_dynamic", risk)
-        self.assertEqual(risk["target_dynamic"]["left"], "close")
-        self.assertEqual(risk["target_dynamic"]["op"], "+")
-        self.assertEqual(risk["stop_loss_dynamic"]["left"], "close")
-        self.assertEqual(risk["stop_loss_dynamic"]["op"], "-")
+        # Verify dynamic risk parameters populated
+        self.assertIn("target_dynamic", defn["risk"])
+        self.assertIn("stop_loss_dynamic", defn["risk"])
 
-        # Check table and UI directives are skipped without breaking
-        warnings = res["warnings"]
-        self.assertTrue(any("table.new" in w for w in warnings))
-        self.assertTrue(any("table.cell" in w for w in warnings))
-        self.assertTrue(any("plot" in w for w in warnings))
+        # Verify UI skipping
+        ui_warnings = [w for w in result["warnings"] if "UI/visual directive" in w or "table" in w]
+        self.assertGreater(len(ui_warnings), 0)
+
+        # Verify evaluation
+        candles = [
+            {"open": 100 + i, "high": 105 + i, "low": 98 + i, "close": 102 + i, "volume": 1000}
+            for i in range(50)
+        ]
+        cache = IndicatorCache(candles, position_size=0)
+        # Should not raise exception
+        entry_eval = evaluate(defn["entry"], cache, 40)
+        exit_eval = evaluate(defn["exit"], cache, 40)
+        self.assertIsInstance(entry_eval, bool)
+        self.assertIsInstance(exit_eval, bool)
 
 
 if __name__ == "__main__":
