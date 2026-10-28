@@ -332,6 +332,18 @@ export interface MarketStatus {
   };
 }
 
+export interface FiiDiiData {
+  date: string;
+  fii_net: string | number;
+  dii_net: string | number;
+  fii_buy?: string | number;
+  fii_sell?: string | number;
+  dii_buy?: string | number;
+  dii_sell?: string | number;
+  updated_at?: number;
+  source?: string;
+}
+
 export interface OptionLeg {
   token?: string;
   trading_symbol?: string;
@@ -692,6 +704,8 @@ export const api = {
       tokens,
       quote_type: quoteType,
     }),
+  fiiDii: (refresh = false) =>
+    get<FiiDiiData>(`/api/v1/market/fii-dii${refresh ? "?refresh=true" : ""}`),
   breadth: (limit = 200) =>
     get<BreadthSnapshot>(`/api/v1/market/breadth?limit=${limit}`),
   candles: (token: string, exchangeSegment: string, interval: string, limit = 400, days?: number) =>

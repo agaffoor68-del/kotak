@@ -30,7 +30,7 @@ from backend.angel.quotes import fetch as angel_fetch
 from backend.api.deps import CurrentUser, angel_call, current_user, require_admin
 from backend.core.config import settings
 from backend.core.database import app_cursor, now
-from backend.marketdata import market_hours, master, search_index, ticks
+from backend.marketdata import fii_dii, market_hours, master, search_index, ticks
 from backend.marketdata.quotes import quote_engine
 
 router = APIRouter(prefix="/api/v1/market", tags=["market"])
@@ -610,3 +610,11 @@ def unsubscribe_feed(
 ) -> dict[str, Any]:
     removed = angel_feed.unsubscribe([token.strip() for token in tokens.split(",") if token.strip()])
     return {"unsubscribed": removed, "total": len(angel_feed.subscription_tokens())}
+
+
+@router.get("/fii-dii")
+def get_fii_dii(
+    refresh: bool = Query(default=False, description="Force refresh upstream FII/DII data"),
+) -> dict[str, Any]:
+    """Daily FII and DII cash market summary (Buy, Sell, Net) cached for 1 hour."""
+    return fii_dii.get_fii_dii_data(force_refresh=refresh)
