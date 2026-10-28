@@ -10,40 +10,47 @@
   html,
   body {
     height: 100%;
-    background: #000000;
+    background-color: #131722;
   }
 
   body {
-    @apply bg-black text-[#EDEDED] font-sans antialiased;
+    background-color: #131722;
+    color: #d1d4dc;
+    font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif;
     -webkit-tap-highlight-color: transparent;
+    font-size: 13px;
+    line-height: 1.4;
   }
 
   ::selection {
-    @apply bg-accent/30 text-ink;
+    background: rgba(41, 98, 255, 0.35);
+    color: #ffffff;
   }
 
   *:focus-visible {
-    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-canvas;
+    outline: none;
+    box-shadow: 0 0 0 1px #2962ff;
   }
 
+  /* Thin TradingView Scrollbars */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #2b3648 #0e131c;
+    scrollbar-color: #2a2e39 #131722;
   }
 
   *::-webkit-scrollbar {
-    width: 9px;
-    height: 9px;
+    width: 6px;
+    height: 6px;
   }
   *::-webkit-scrollbar-track {
-    background: #0e131c;
+    background: #131722;
   }
   *::-webkit-scrollbar-thumb {
-    background: #2b3648;
-    border-radius: 6px;
+    background: #2a2e39;
+    border-radius: 2px;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: #3b4a61;
+    background: #363a45;
   }
 
   input[type="number"] {
@@ -59,126 +66,125 @@
   }
 }
 
+/* Global TradingView Utility Classes */
 @layer components {
-  .panel {
-    @apply rounded-md border border-[#333333] bg-[#0A0A0A];
+  /* Flat TV Panel */
+  .tv-panel {
+    background-color: #1e222d;
+    border: 1px solid #2a2e39;
+    border-radius: 4px;
   }
 
-  .panel-head {
-    @apply flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-3;
+  /* Panel Header with title and optional link */
+  .tv-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #2a2e39;
+    font-size: 12px;
+    font-weight: 600;
+    color: #d1d4dc;
   }
 
-  .panel-title {
-    @apply text-2xs font-semibold uppercase tracking-[0.14em] text-ink;
+  /* Dense TV list row */
+  .tv-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #2a2e39;
+    font-size: 12px;
+    transition: background-color 0.15s ease;
+  }
+  .tv-row:hover {
+    background-color: #2a2e39;
+  }
+  .tv-row:last-child {
+    border-bottom: none;
   }
 
-  .panel-body {
-    @apply p-4;
+  /* Minimal TV Buttons */
+  .tv-btn-primary {
+    background-color: #2962ff;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+  }
+  .tv-btn-primary:hover {
+    background-color: #1e4bd8;
   }
 
-  .label-caps {
-    @apply text-3xs font-semibold uppercase tracking-[0.12em] text-ink-faint;
+  .tv-btn-ghost {
+    background: transparent;
+    color: #787b86;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+  }
+  .tv-btn-ghost:hover {
+    background-color: #2a2e39;
+    color: #d1d4dc;
   }
 
-  .num {
-    @apply font-mono tabular-nums;
+  /* TV Form Inputs: minimal with bottom border */
+  .tv-input {
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid #2a2e39;
+    color: #d1d4dc;
+    font-size: 12px;
+    padding: 6px 2px;
+    border-radius: 0;
+    transition: border-color 0.15s ease;
   }
-
-  .btn {
-    @apply inline-flex select-none items-center justify-center gap-2 rounded-md border border-edge
-      bg-[#171717] px-3 py-2 text-2xs font-semibold uppercase tracking-wider text-[#EDEDED]
-      transition-colors duration-100 hover:border-[#666666] hover:bg-[#1A1A1A]
-      active:translate-y-px
-      disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-edge disabled:hover:bg-elevated;
-  }
-  .btn-primary {
-    @apply border-transparent bg-accent text-white hover:bg-[#2F6FE4] hover:border-transparent;
-  }
-  .btn-buy {
-    @apply border-transparent bg-[#17C964] font-bold text-black hover:bg-[#20D978] hover:border-transparent;
-  }
-  .btn-sell {
-    @apply border-transparent bg-[#F31260] font-bold text-white hover:bg-[#ff2b73] hover:border-transparent;
-  }
-  .btn-ghost {
-    @apply border-transparent bg-transparent hover:border-edge hover:bg-elevated;
-  }
-  .btn-sm {
-    @apply px-2.5 py-1.5;
-  }
-  .btn-lg {
-    @apply px-4 py-2.5 text-xs;
-  }
-
-  .field {
-    @apply flex flex-col gap-1;
-  }
-  .field-label {
-    @apply text-3xs font-semibold uppercase tracking-[0.12em] text-ink-faint;
-  }
-  .field-input,
-  .field-select {
-    @apply w-full rounded-md border border-edge bg-canvas px-3 py-2 font-mono text-sm text-ink
-      placeholder:text-ink-faint/70
-      focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50
-      disabled:cursor-not-allowed disabled:opacity-40;
-  }
-  .field-select {
-    @apply font-sans;
-  }
-
-  .chip {
-    @apply inline-flex items-center gap-1 rounded border px-2 py-0.5 text-3xs font-semibold uppercase tracking-wider;
-  }
-  .chip-live {
-    @apply border-up/40 bg-up-soft text-up;
-  }
-  .chip-idle {
-    @apply border-edge bg-elevated text-ink-dim;
-  }
-  .chip-warn {
-    @apply border-warn/40 bg-warn-soft text-warn;
-  }
-  .chip-error {
-    @apply border-down/40 bg-down-soft text-down;
-  }
-  .chip-info {
-    @apply border-accent/40 bg-accent-soft text-accent;
-  }
-
-  .tbl {
-    @apply w-full text-sm;
-  }
-  .tbl thead th {
-    @apply sticky top-0 z-10 border-b border-[#333333] bg-[#0A0A0A] px-3 py-2 text-left
-      text-xs font-semibold uppercase tracking-[0.1em] text-[#888888];
-  }
-  .tbl tbody td {
-    @apply border-b border-[#333333]/70 px-3 py-2;
-  }
-  .tbl tbody tr:hover {
-    @apply bg-elevated/60;
-  }
-
-  .link {
-    @apply text-accent underline-offset-2 hover:underline;
-  }
-  .divider {
-    @apply border-t border-hairline;
+  .tv-input:focus {
+    border-bottom-color: #2962ff;
+    outline: none;
+    box-shadow: none;
   }
 }
 
+/* Flash Animations */
+.flash-up {
+  animation: tvFlashGreen 0.6s ease-out;
+}
+.flash-down {
+  animation: tvFlashRed 0.6s ease-out;
+}
+
+@keyframes tvFlashGreen {
+  0% {
+    background-color: rgba(8, 153, 129, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes tvFlashRed {
+  0% {
+    background-color: rgba(242, 54, 69, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Subtle fade in */
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.25s ease-out forwards;
 }
