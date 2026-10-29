@@ -205,7 +205,7 @@ def angel_call(user: CurrentUser | None = None, account_id: str | None = None) -
     configured the caller gets a 400 explaining exactly what to do, rather
     than an opaque connection error.
     """
-    from backend.angel.auth import AngelAuthError, angel_session_manager
+    from backend.providers.fyers.fyers_auth_service import FyersAuthService
 
     # Market data belongs to whichever Angel account exists, never to the
     # caller's Kotak account. A requested/account-bound id is only honoured when

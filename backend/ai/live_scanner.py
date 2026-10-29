@@ -20,7 +20,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
-from backend.angel import candles
+from backend.providers.fyers.history_service import FyersHistoryService
 from backend.core.database import app_cursor, market_cursor
 from backend.strategies.indicators import ema, rsi, supertrend, vwap
 

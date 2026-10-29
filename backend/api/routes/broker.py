@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
-from backend.angel.auth import AngelAuthError, angel_session_manager
+from backend.providers.fyers.fyers_auth_service import FyersAuthService
 from backend.api.deps import (
     CurrentUser,
     angel_session_health,

@@ -21,12 +21,12 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from backend.angel import breadth as angel_breadth
-from backend.angel import candles as angel_candles
-from backend.angel import instruments as angel_instruments
-from backend.angel.feed import angel_feed
-from backend.angel.quotes import QuoteError as AngelQuoteError
-from backend.angel.quotes import fetch as angel_fetch
+from backend.providers.fyers import quote_service as fyers_quotes
+from backend.providers.fyers.history_service import FyersHistoryService
+from backend.providers.fyers.symbol_master import FyersSymbolMaster
+from backend.providers.fyers.socket_feed import FyersSocketFeed
+from backend.providers.base import ProviderError
+from backend.providers.fyers.quote_service import FyersQuoteService
 from backend.api.deps import CurrentUser, angel_call, current_user, require_admin
 from backend.core.config import settings
 from backend.core.database import app_cursor, now

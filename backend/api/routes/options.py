@@ -16,8 +16,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from backend.angel.quotes import QuoteError as AngelQuoteError
-from backend.angel.quotes import fetch as angel_fetch
+from backend.providers.base import ProviderError
+from backend.providers.fyers.quote_service import FyersQuoteService
 from backend.api.deps import CurrentUser, angel_call, broker_call, current_user, resolve_account_id
 from backend.core.database import app_cursor
 from backend.marketdata import master
