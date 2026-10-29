@@ -6,7 +6,7 @@
 # with --no-deps (see Dockerfile.render) so it can't downgrade us.
 
 fastapi>=0.115,<1
-uvicorn[standard]==0.30.0
+uvicorn[standard]>=0.30,<0.35
 pydantic>=2.7,<3
 pydantic-settings>=2,<3
 python-dotenv>=1.0,<2

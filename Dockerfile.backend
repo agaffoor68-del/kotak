@@ -26,8 +26,8 @@ COPY backend/requirements.txt ./backend-requirements.txt
 # TASK 4 / TASK 1: Install app requirements; pin websockets==8.1 (compatible with Kotak Neo v2)
 # Uvicorn[standard]>=0.30 works with websockets>=8.1 (no breakage);
 # we explicitly pin to 8.1 to avoid auto-upgrade conflicts with SDK.
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install -r backend-requirements.txt
+RUN pip install --no-cache-dir -v --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -v -r backend-requirements.txt 2>&1 | tee /tmp/pip_install.log || (echo 'PIP FAILED - see /tmp/pip_install.log' && cat /tmp/pip_install.log && exit 1)
 
 # TASK 3: Install Kotak Neo API without dependencies (workaround for ancient exact pins)
 RUN pip install --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client"
