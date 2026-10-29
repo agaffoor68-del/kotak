@@ -17,11 +17,13 @@ RUN apt-get update && \
 
 COPY backend/requirements.txt ./backend-requirements.txt
 
-# TASK 2 + 3: EXACT COMMAND — no tee, no || true, --no-cache-dir on every pip, loud failure
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r backend-requirements.txt && \
-    pip install --no-cache-dir --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" && \
-    pip install --no-cache-dir "websockets==8.1" "websocket-client>=1.8,<2" six python-dateutil
+# The SDK source is vendored in this repository. Installing it from GitHub made
+# image builds depend on a remote tag and failed before the application was copied.
+COPY neo_api_client/ ./neo_api_client/
+
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python -m pip install --no-cache-dir -r backend-requirements.txt && \
+    python -m pip install --no-cache-dir "websocket-client>=1.8,<2" six python-dateutil
 
 # Only after ALL pip install succeeds: purge build tools (not before!)
 RUN apt-get purge -y --auto-remove build-essential curl git || true
