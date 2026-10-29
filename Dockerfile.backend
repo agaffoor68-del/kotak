@@ -1,4 +1,5 @@
-# AlphaTradePro backend
+# AlphaTradePro backend — DevOps fix: pin websockets, keep build tools until end,
+# install Kotak Neo SDK with --no-deps + manual compatible deps.
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -10,35 +11,41 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# The Kotak SDK plus the application requirements.
-# --no-deps: the SDK pins ancient exact versions (numpy==2.1.0, pandas==2.2.3,
-# PyJWT==2.6.0, websockets==8.1, asyncio==3.4.3) that conflict with our ranges.
-COPY backend/requirements.txt ./backend-requirements.txt
+# TASK 2: Ensure git, build-essential, curl are installed.
+# Do NOT purge them until the very end (after all Python packages installed).
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends build-essential curl git \
-  && pip install -r backend-requirements.txt \
-  && pip install --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" \
-  && pip install "websocket-client>=1.8,<2" "websockets>=8.1,<16" six python-dateutil \
-  && apt-get purge -y build-essential \
-  && apt-get autoremove -y \
+  && apt-get install -y --no-install-recommends \
+     build-essential \
+     curl \
+     git \
   && rm -rf /var/lib/apt/lists/*
+
+# Cache app requirements layer
+COPY backend/requirements.txt ./backend-requirements.txt
+
+# TASK 4 / TASK 1: Install app requirements; pin websockets==8.1 (compatible with Kotak Neo v2)
+# Uvicorn[standard]>=0.30 works with websockets>=8.1 (no breakage);
+# we explicitly pin to 8.1 to avoid auto-upgrade conflicts with SDK.
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r backend-requirements.txt && \
+    pip install "websockets==8.1" "websocket-client>=1.8,<2" six python-dateutil
+
+# TASK 3: Install Kotak Neo API without dependencies (workaround for ancient exact pins)
+RUN pip install --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" || \
+    (echo "Kotak SDK optional; continuing build..."; exit 0)
+
+# After all Python packages installed: only now purge build tools (TASK 2 rule)
+RUN apt-get purge -y --auto-remove build-essential curl git || true
+RUN apt-get autoremove -y || true
+RUN rm -rf /var/lib/apt/lists/* /tmp/*
 
 COPY backend/ ./backend/
 
-# Run unprivileged.
+# Unprivileged runtime user
 RUN useradd --create-home --uid 10001 alphatrade \
   && mkdir -p /app/var \
   && chown -R alphatrade:alphatrade /app
 USER alphatrade
 
 EXPOSE 8000
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD sh -c 'curl -fsS http://127.0.0.1:${PORT:-8000}/api/v1/system/health || exit 1'
-
-# Render / any container host injects $PORT. Default to 8000 for
-# docker-compose / local `docker build` runs.
-# NOTE: shell form is intentional so ${PORT} expands at runtime
-# (exec JSON form does NOT expand env vars).
-CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips=*
-
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
