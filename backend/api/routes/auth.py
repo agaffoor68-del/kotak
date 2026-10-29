@@ -261,3 +261,20 @@ def update_user_settings(
         "role": updated["role"],
         "whatsapp_number": updated.get("whatsapp_number"),
     }
+
+# --- Fyers login/callback endpoints (Task 1) ---
+from fastapi import APIRouter
+from backend.providers.fyers.fyers_auth_service import FyersAuthService
+
+router_fyers = APIRouter(prefix="/api/v1/fyers", tags=["fyers"])
+fyers_auth = FyersAuthService()
+
+@router_fyers.get("/login")
+def fyers_login():
+    # Redirect to Fyers auth URL (SessionModel.generate_auth_code)
+    return {"auth_url": fyers_auth.generate_auth_url()}
+
+@router_fyers.get("/callback")
+def fyers_callback(code: str):
+    token = fyers_auth.generate_token(code)
+    return {"access_token": token, "status": "stored"}

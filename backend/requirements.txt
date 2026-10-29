@@ -33,3 +33,6 @@ structlog>=24,<26
 # be dead weight and another way for the Render build to fail.
 
 pandas_ta>=0.3.14b0
+fyers-apiv3>=2.0.0
+requests>=2.31
+pandas>=2.0

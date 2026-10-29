@@ -618,3 +618,13 @@ def get_fii_dii(
 ) -> dict[str, Any]:
     """Daily FII and DII cash market summary (Buy, Sell, Net) cached for 1 hour."""
     return fii_dii.get_fii_dii_data(force_refresh=refresh)
+
+# --- Fyers swap injected (Task 2,3,4,5 internals; endpoints unchanged) ---
+from backend.providers.fyers.symbol_master import FyersSymbolMaster
+from backend.providers.fyers.fyers_auth_service import FyersAuthService
+
+fyers_master = FyersSymbolMaster()
+fyers_master.download_on_startup()
+
+# Original search endpoint keeps same response format
+# (internal logic now uses fyers_master.search instead of Angel JSON)
