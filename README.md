@@ -150,10 +150,10 @@ python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 cd web && npm install && npm run dev
 ```
 
-Open <http://localhost:3000>, sign in with the bootstrap admin, then connect an **Angel One**
-account (which powers all market data) and a **Kotak Neo** account (for live orders). The
-instrument master syncs from Angel automatically on first boot and can be re-run from
-**Settings**, or via `POST /api/v1/market/sync-master`.
+Open <http://localhost:3000>, sign in with the bootstrap admin, then connect a **Fyers** account
+(which powers all market data via the pluggable provider interface) and a **Kotak Neo** account
+(for live orders). The instrument master syncs from Fyers automatically on first boot and can be
+re-run from **Settings**, or via `POST /api/v1/market/sync-master`.
 
 ---
 
@@ -178,7 +178,28 @@ needs no broker argument.
 
 ## Deployment
 
-See **[DEPLOY.md](DEPLOY.md)** for Docker Compose, systemd, nginx and CI/CD.
+### Docker
+
+The backend ships two Dockerfiles:
+
+* [`Dockerfile.backend`](Dockerfile.backend) — used by Docker Compose (`docker compose up -d --build`).
+* [`Dockerfile.render`](Dockerfile.render) — used by Render (see [`render.yaml`](render.yaml)).
+
+Both bring in the **vendored** `neo_api_client/` folder and install from `backend/requirements.txt`,
+which pins the dependency versions (`uvicorn==0.13.4`, `websockets==8.1`).
+
+### Render
+
+The Render deployment runs the backend as a Docker web service using `Dockerfile.render` via
+`render.yaml`:
+
+* **Build**: Docker runtime, `dockerContext: .`, `dockerfilePath: ./Dockerfile.render`.
+* **Start command**: `python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}` (shell form,
+  so Render’s injected `$PORT` is expanded at runtime).
+* **Health check**: `GET /api/v1/system/health` (pointed at `/api/v1/system/health` in the app; Render health
+  probe uses `/health` which is handled by the same process).
+
+See **[DEPLOY.md](DEPLOY.md)** for full Docker Compose, systemd, nginx and CI/CD details.
 Running a single always-on VM? **[CLOUD.md](CLOUD.md)** wires the stack with a watchdog and
 backups, and **[HOSTINGER.md](HOSTINGER.md)** adapts it step by step to a Hostinger VPS
 (hPanel firewall, DNS, dedicated static IP for the SEBI requirement, certbot).
@@ -244,12 +265,20 @@ maths and the wiring. Nothing in `backend/` generates market data at runtime.
 | `REDIRECT_URL` | — | Pin the exact redirect string a broker was given |
 | `REDIRECT_ALLOWLIST` | — | Extra allowed callback targets (comma-separated) |
 | `REQUIRE_HTTPS` | `0` | Reject a redirect that arrives over plain HTTP |
-| **Angel One (data + optional execution)** | | |
+| **Market data (Fyers API v3)** | | |
+| `MARKET_DATA_PROVIDER` | `fyers` | Source for quotes / candles / master: `fyers` or `angel` |
+| `FYERS_APP_ID`, `FYERS_SECRET_ID` | — | FYERS OAuth app credentials (create at https://myapi.fyers.in/dashboard/) |
+| `FYERS_REDIRECT_URI`, `FYERS_REDIRECT_PATH` | — | OAuth callback (defaults derive from `PUBLIC_URL`) |
+| `FYERS_PIN` | — | Refresh-token secret (enables refresh flow) |
+| `FYERS_ACCESS_TOKEN`, `FYERS_TOKEN_FILE` | — | Persisted daily access token |
+| `FYERS_RATE_LIMIT_PER_SECOND` | `3` | FYERS rate limit |
+| `FYERS_MAX_SYMBOLS_PER_CALL` | `50` | Symbols per quote call |
+| `FYERS_HISTORY_DAYS_DEFAULT` / `_MAX` | `30` / `1800` | Candle lookback window |
+| `FYERS_POLL_SECONDS_OPEN` / `_CLOSED` | `1` / `60` | Live feed poll cadence |
+| `FYERS_SYMBOL_MASTER_URL`, `FYERS_SYMBOL_MASTER_TTL` | — / `720` | Instrument-master source + cache TTL |
+| **Angel One (execution, optional)** | | |
 | `ANGEL_ENVIRONMENT` | `prod` | `prod` or `uat` |
 | `ANGEL_SESSION_TTL_SECONDS` | `28800` | Force a fresh login after this age |
-| `ANGEL_RATE_LIMIT_PER_SECOND` | `3` | SmartAPI allows ~3 requests/second |
-| `ANGEL_MAX_TOKENS_PER_CALL` | `50` | Symbols per quote call |
-| `ANGEL_HISTORY_DAYS_DEFAULT` / `_MAX` | `30` / `1800` | Candle lookback window |
 | **Kotak Neo (execution)** | | |
 | `KOTAK_ENVIRONMENT` | `prod` | `prod` or `uat` |
 | `KOTAK_KEEPALIVE`, `KOTAK_KEEPALIVE_SECONDS` | `1`, `300` | Session refresh loop |
@@ -277,14 +306,15 @@ maths and the wiring. Nothing in `backend/` generates market data at runtime.
 
 ## Scope and honesty
 
-* **Market data is Angel One only. Execution is Kotak Neo and/or Angel One.** There is no third
-  fallback broker and no fallback data source.
+* **Market data is Fyers API v3, execution is Kotak Neo and/or Angel One.** There is no third
+  fallback broker; the market-data provider can be switched (`MARKET_DATA_PROVIDER=fyers` or
+  `angel`) but the platform's default is Fyers.
 * **A static IP and a registered redirect URL are deployment prerequisites**, not optional extras.
   SEBI requires the broker to see a fixed source address on order APIs, and OAuth flows need a
   pre-registered callback. Both are reported in **Settings → Deployment**, and the platform warns
   the moment the egress IP stops matching the one that was registered.
-* **Candles are Angel's real history**, not a tape this platform invented. The historic feed is
-  chunked, IST-corrected and cached; coverage grows as ticks are recorded too.
+* **Candles are Fyers' real history**, fetched from FYERS' `/data/history`, chunked and cached
+  in IST-corrected buckets; coverage grows as ticks are recorded too.
 * **Greeks are computed**, using exchange-reported IV or an IV backed out of the traded premium by
   bisection. They are never assumed.
 * **The AI coach reviews process, not markets.** It detects patterns in your own trade history
