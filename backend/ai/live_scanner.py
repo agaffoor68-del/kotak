@@ -270,7 +270,7 @@ def bootstrap_candles(underlying: str, call: Callable[..., Any] | None = None, m
                 from backend.marketdata import ticks
                 now_ts = time.time()
                 upsert_rows = [
-                    (token, segment, "5m", int(c["time"] // 300), c["open"], c["high"], c["low"], c["close"], c.get("volume", 0), 1, now_ts)
+                    (token, segment, "5m", int(c["time"] // 300), c["open"], c["high"], c["low"], c["close"], c.get("volume", 0), 1, now_ts, 0)
                     for c in yf_candles
                 ]
                 ticks.upsert_candles(token, segment, "5m", upsert_rows)

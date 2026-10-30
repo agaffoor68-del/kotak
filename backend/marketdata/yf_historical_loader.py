@@ -228,7 +228,7 @@ def store_candles(
         (
             str(token), exchange_segment, interval,
             int(candle["time"] // seconds), candle["open"], candle["high"],
-            candle["low"], candle["close"], candle["volume"], updated_at,
+            candle["low"], candle["close"], candle["volume"], updated_at, 0,
         )
         for candle in candles
     ]

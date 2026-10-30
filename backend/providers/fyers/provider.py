@@ -333,7 +333,7 @@ class FyersProvider(MarketDataProvider):
             (
                 token, exchange_segment, interval, int(candle["time"] // seconds),
                 candle["open"], candle["high"], candle["low"], candle["close"],
-                candle.get("volume") or 0, time.time(),
+                candle.get("volume") or 0, time.time(), 0,
             )
             for candle in candles
         ]

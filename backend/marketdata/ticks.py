@@ -107,6 +107,7 @@ def _flush_locked() -> int:
                     volumes[-1] if volumes else 0.0,
                     len(tick_list),
                     now_ts,
+                    0,
                 ))
 
             with market_cursor() as cursor:
@@ -154,7 +155,7 @@ def upsert_candles(token: str, exchange_segment: str, interval: str, rows: list[
             cursor.executemany(
                 """
                 INSERT INTO candles (token, exchange_segment, interval, bucket, open, high, low, close, volume, trades, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,1,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(token, exchange_segment, interval, bucket) DO UPDATE SET
                     high   = MAX(candles.high, excluded.high),
                     low    = MIN(candles.low, excluded.low),
