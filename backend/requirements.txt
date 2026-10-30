@@ -20,6 +20,9 @@ reportlab>=4,<5
 qrcode>=7.4,<9
 structlog>=24,<26
 pandas_ta==0.3.14b0
+setuptools<82
+pip<24
+wheel<0.45
 
 six
 python-dateutil
