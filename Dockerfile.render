@@ -1,6 +1,6 @@
 # AlphaTradePro backend — Render deployment image
-# Fixed dependency conflict: websockets==8.1 (Kotak Neo) + fyers-apiv3 (no-deps)
-FROM python:3.12-slim
+# Fixed dependency conflict: fyers-apiv2 (compatible with websockets==8.1)
+FROM python:3.10-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -12,7 +12,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install build tools before pip (do NOT purge until very end)
+# Install build tools before any pip install (do NOT purge until very end)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential \
@@ -25,22 +25,19 @@ RUN apt-get update && \
 # Copy requirements first for caching
 COPY backend/requirements.txt /tmp/requirements.txt
 
-# Step 1: Install base requirements (pinned for compatibility)
+# Step 1: Install base requirements (includes fyers-apiv2==2.0.9 from requirements.txt)
 RUN python -m pip install --upgrade pip setuptools wheel && \
     python -m pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Step 2: Install Fyers API v3 WITHOUT dependencies (to avoid websockets conflict)
-RUN python -m pip install --no-cache-dir --no-deps fyers-apiv3
-
-# Step 3: Install Fyers API manual dependencies (compatible with websockets==8.1)
-RUN python -m pip install --no-cache-dir \
-    "websocket-client>=1.8,<2" \
-    aiohttp \
-    "requests>=2.31.0"
-
-# Step 4: Install Kotak Neo SDK from GitHub tag (without dependencies to avoid conflicts)
+# Step 2: Install Kotak Neo SDK WITHOUT dependencies (to avoid websockets conflict)
 RUN python -m pip install --no-cache-dir --no-deps \
     "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client"
+
+# Step 3: Manually install compatible dependencies for both SDKs
+RUN python -m pip install --no-cache-dir \
+    "websocket-client>=1.8,<2" \
+    six \
+    python-dateutil
 
 # Only after ALL pip install succeeds: purge build tools
 RUN apt-get purge -y --auto-remove build-essential python3-dev libssl-dev git curl || true
