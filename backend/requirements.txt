@@ -20,6 +20,6 @@ reportlab>=4,<5
 qrcode>=7.4,<9
 structlog>=24,<26
 pandas_ta==0.3.14b0
-fyers-apiv2==2.0.9
+
 six
 python-dateutil

@@ -1,5 +1,5 @@
 # AlphaTradePro backend — Render deployment image
-# Fixed dependency conflict: fyers-apiv2 (compatible with websockets==8.1)
+# Fixed dependency conflict: fyers-apiv3 installed --no-deps to avoid websockets conflict
 FROM python:3.10-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -25,15 +25,24 @@ RUN apt-get update && \
 # Copy requirements first for caching
 COPY backend/requirements.txt /tmp/requirements.txt
 
-# Step 1: Install base requirements (includes fyers-apiv2==2.0.9 from requirements.txt)
+# Step 1: Install base requirements (no fyers package here; installed separately)
 RUN python -m pip install --upgrade pip setuptools wheel && \
     python -m pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Step 2: Install Kotak Neo SDK WITHOUT dependencies (to avoid websockets conflict)
+# Step 2: Install Fyers API WITHOUT its dependencies (to avoid websockets conflict)
+RUN python -m pip install --no-cache-dir --no-deps fyers-apiv3
+
+# Step 3: Manually install Fyers' compatible dependencies (compatible with websockets==8.1)
+RUN python -m pip install --no-cache-dir \
+    "websocket-client>=1.8,<2" \
+    "aiohttp" \
+    "requests>=2.31.0"
+
+# Step 4: Install Kotak Neo SDK WITHOUT dependencies (to avoid websockets conflict)
 RUN python -m pip install --no-cache-dir --no-deps \
     "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client"
 
-# Step 3: Manually install compatible dependencies for both SDKs
+# Step 5: Manually install compatible dependencies for Kotak SDK
 RUN python -m pip install --no-cache-dir \
     "websocket-client>=1.8,<2" \
     six \
