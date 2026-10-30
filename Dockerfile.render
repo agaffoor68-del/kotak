@@ -5,11 +5,12 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore \
     TZ=Asia/Kolkata \
-    PORT=8000
+    PORT=8000 \
+    PYTHONPATH=/app
 
 WORKDIR /app
 
-# Required for pip install from git + build tools
+# Required for pip installs + build tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential \
@@ -17,19 +18,16 @@ RUN apt-get update && \
       git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only requirements first for caching
+# Copy only requirements first for caching, then the vendored SDK source
 COPY backend/requirements.txt /tmp/requirements.txt
+COPY neo_api_client/ ./neo_api_client/
 
+# The Kotak Neo SDK source is vendored in this repository (neo_api_client/).
+# It is copied into the image and resolved via PYTHONPATH=/app — no GitHub tag
+# install, no pinned-transitive-version conflicts from the old git+@<tag> pin.
 RUN python -m pip install --upgrade pip setuptools wheel && \
-    python -m pip install -r /tmp/requirements.txt
-
-# Kotak SDK is optional in CI/Render; do not crash build if package is unavailable.
-# --no-deps: the SDK pins ancient exact versions (numpy==2.1.0, pandas==2.2.3,
-# PyJWT==2.6.0, websockets==8.1, asyncio==3.4.3) that conflict with our ranges.
-# Its real runtime needs (requests, websocket-client, six, ...) are already
-# covered by requirements.txt or install explicitly below.
-RUN python -m pip install --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" || echo "Kotak SDK install skipped (optional)"
-RUN python -m pip install "websocket-client>=1.8,<2" "websockets>=8.1,<16" six python-dateutil || true
+    python -m pip install -r /tmp/requirements.txt && \
+    python -m pip install --no-cache-dir "websocket-client>=1.8,<2" six python-dateutil
 
 # Copy app code — keep repo layout (/app/backend/...) so `backend.main:app` imports work
 COPY backend/ /app/backend/

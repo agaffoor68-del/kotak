@@ -3,33 +3,33 @@ Institutional algorithmic trading for the Indian markets, built on **two brokers
 
 | Role | Broker | Why |
 | --- | --- | --- |
-| **Market data** — instrument master, live quotes, historical candles | **Angel One SmartAPI** | Kotak Neo publishes **no historical candle API**, so candles and the instrument master come from Angel |
+| **Market data** — instrument master, live quotes, historical candles | **Fyers API v3** | FYERS now provides live quotes, historical candles and the instrument master |
 | **Execution** — place / modify / cancel orders | **Kotak Neo** *and/or* **Angel One** | A signal can be routed to either broker, or fanned out to both |
 
 No simulated prices, no demo data, no placeholder option chains. Every figure on every screen
-comes from Angel One SmartAPI. When the data session is down, the interface says so — it never
+comes from the Fyers market-data API. When the data session is down, the interface says so — it never
 fills the gap with invented numbers.
 
 ---
 
 ## Data flow
 ```
-                 ┌──────────────────────────────┐
-   Angel One     │  instrument master · live quotes · candles    │
-   SmartAPI  ───►│  (1m 3m 5m 15m 30m 60m 1d)                    │───►  Website / charts /
-   (data only)   │  NO order flow goes here for data purposes    │      backtests / algo engine
-                 └──────────────────────────────┘
-                                        │
-                                        ▼
-                                 Strategy / order signal
-                                        │
-                     ┌──────────────────┴──────────────────┐
-                     ▼                                     ▼
-            Kotak Neo Trade API                   Angel One SmartAPI
-            (order execution)                     (order execution)
+                  ┌──────────────────────────────┐
+    Fyers API v3  │  instrument master · live quotes · candles    │
+    Fyers API v3  ──►│  (1m 3m 5m 15m 30m 60m 1d)                    │───►  Website / charts /
+    (data only)   │  NO order flow goes here for data purposes    │      backtests / algo engine
+                  └──────────────────────────────┘
+                                         │
+                                         ▼
+                                  Strategy / order signal
+                                         │
+                      ┌──────────────────┴──────────────────┐
+                      ▼                                     ▼
+             Kotak Neo Trade API                   Angel One SmartAPI
+             (order execution)                     (order execution)
 ```
 
-* Angel One is the **only** market-data source. Kotak is never asked for candles or quotes.
+* Fyers API v3 is the **only** market-data source. Kotak is never asked for candles or quotes.
 * Kotak Neo is the **default** execution venue; Angel One execution is opt-in per order.
 * `broker: "both"` fans one signal out to every enabled broker, each resolved to *its own*
   account — an Angel order cannot be sent to a Kotak client code or vice versa.
@@ -37,15 +37,16 @@ fills the gap with invented numbers.
 ---
 
 ## Why the split exists
-Kotak Neo's quote endpoints are live-only and its scrip master is static reference data, not
-price history. A backtester over candles this platform invented for itself would be fiction;
-a backtester over Angel One's real historical candles is not. So:
+Fyers API v3 serves the full market-data job in one place: live quotes, historical candles and the
+instrument master, all behind a single read-only provider. The platform talks to it through a
+pluggable provider interface (`backend/providers/`), so a future data source only needs one new
+module — routes, WebSocket plumbing and the UI stay untouched.
 
-* **Candles** come from Angel's `/historical/v1/getCandleData`, converted from IST and cached.
-* **The instrument master** comes from Angel's public `OpenAPIScripMaster.json`, normalised into
-  the shared `instruments` table (`source = 'angel'`).
-* **Live quotes** come from Angel's `/market/v1/quote` (LTP / OHLC / FULL), normalised into the
-  platform's `Quote` and recorded as ticks so coverage keeps growing.
+* **Candles** come from FYERS' `/data/history`, fetched in IST-normalised chunks and cached.
+* **The instrument master** comes from FYERS' public symbol master, normalised into the shared
+  `instruments` table.
+* **Live quotes** come from FYERS' `/data/quotes` endpoint and the FYERS Data Socket (LTP / OHLC /
+  FULL), normalised into the platform's `Quote` and recorded as ticks so coverage keeps growing.
 * **Every order** still clears the same gates it always did before reaching Kotak or Angel.
 
 > **SEBI note.** Kotak Neo requires a **registered static IP** for its order APIs. Register this
@@ -62,7 +63,7 @@ nginx ── /            → Next.js standalone        :3000
        ├─ /api/        → FastAPI                  :8000
        └─ /ws/market   → FastAPI WebSocket feed
                               │
-                              ├──► Angel One SmartAPI   (market data: master, quotes, candles)
+                              ├──► Fyers API v3         (market data: master, quotes, candles)
                               ├──► Kotak Neo Trade API  (order execution: TOTP + MPIN session)
                               └──► Angel One SmartAPI   (order execution: TOTP session)
 ```
@@ -70,7 +71,8 @@ nginx ── /            → Next.js standalone        :3000
 ```
 backend/
   core/        config, security (PBKDF2 + JWT), vault (Fernet, both brokers), database (SQLite)
-  angel/       auth (SmartAPI sessions), instruments (master sync), candles, quotes, orders, feed
+  providers/   base (MarketDataProvider interface) + fyers (FYERS API v3: quotes, history, master, socket feed)
+  angel/       execution adapter (SmartAPI orders) + session glue (execution / optional market data)
   broker/      neo_auth (Kotak session manager), accounts (multi-broker credential registry)
   marketdata/  quotes (cache), ticks (recorder), market_hours, master (shared instrument table)
   strategies/  indicators, dsl (no-code engine), templates
@@ -82,7 +84,7 @@ backend/
   analytics/   metrics (Sharpe, Sortino, CAGR, drawdown)
   alerts/      service (Telegram, WhatsApp, email)
   ai/          coach (deterministic patterns + optional LLM)
-  api/         routes, deps (auth/RBAC, angel_call), ws
+  api/         routes, deps (auth/RBAC, market data / execution deps), ws
   deployment.py  static IP detection + redirect URL resolution (SEBI prerequisites)
 ```
 
@@ -95,8 +97,12 @@ git clone <your-repo> alphatrade && cd alphatrade
 
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r backend/requirements.txt
-pip install "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client"
 ```
+
+> **Note:** the Kotak Neo SDK (`neo_api_client`) source is now **vendored** in this repository at
+> [`neo_api_client/`](neo_api_client/) and is picked up from the repository root — no
+> `pip install git+...` step is needed anymore, which also avoids the dependency conflicts the old
+> GitHub-tag install used to cause.
 
 ### 2. Generate secrets
 ```sh
@@ -124,7 +130,8 @@ vault. Environment variables are only a single-account fallback:
 
 | Variable | Broker | Purpose |
 | --- | --- | --- |
-| `ANGEL_API_KEY`, `ANGEL_CLIENT_CODE`, `ANGEL_PIN`, `ANGEL_TOTP_KEY` | Angel One | **Market data** (create the key at SmartAPI → My Apps) |
+| `FYERS_APP_ID`, `FYERS_SECRET_ID`, `FYERS_REDIRECT_URI`, `FYERS_PIN` | Fyers | **Market data** (create the app at <https://myapi.fyers.in/dashboard/>) |
+| `ANGEL_API_KEY`, `ANGEL_CLIENT_CODE`, `ANGEL_PIN`, `ANGEL_TOTP_KEY` | Angel One | **Execution** (create the key at SmartAPI → My Apps) |
 | `KOTAK_CONSUMER_KEY`, `KOTAK_TOTP_KEY`, `KOTAK_MOBILE_NUMBER`, `KOTAK_MPIN`, `KOTAK_UCC` | Kotak Neo | **Order execution** |
 
 **Two independent authentication flows.** Angel and Kotak each have their own TOTP session; the

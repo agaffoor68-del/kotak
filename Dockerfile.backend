@@ -6,7 +6,8 @@ ENV PYTHONUNBUFFERED=1 \
   PIP_NO_CACHE_DIR=1 \
   PIP_ROOT_USER_ACTION=ignore \
   TZ=Asia/Kolkata \
-  PORT=8000
+  PORT=8000 \
+  PYTHONPATH=/app
 
 WORKDIR /app
 
