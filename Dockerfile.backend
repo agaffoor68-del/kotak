@@ -3,7 +3,6 @@ FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
   PYTHONDONTWRITEBYTECODE=1 \
-  PIP_NO_CACHE_DIR=1 \
   PIP_ROOT_USER_ACTION=ignore \
   TZ=Asia/Kolkata \
   PORT=8000
@@ -18,7 +17,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends build-essential curl git \
   && pip install -r backend-requirements.txt \
   && pip install --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" || echo "Kotak SDK install skipped (optional)" \
-  && pip install "websocket-client>=1.8,<2" "websockets>=8.1,<16" "wsproto>=1.2,<2" six python-dateutil || true \
+  && pip install "websocket-client>=1.8,<2" "websockets==8.1" "wsproto>=1.2,<2" six python-dateutil || true \
   && apt-get purge -y build-essential \
   && apt-get autoremove -y \
   && rm -rf /var/lib/apt/lists/*
@@ -40,5 +39,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # docker-compose / local `docker build` runs.
 # NOTE: shell form is intentional so ${PORT} expands at runtime
 # (exec JSON form does NOT expand env vars).
-CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips=*
+CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --ws wsproto --proxy-headers --forwarded-allow-ips=*
 
