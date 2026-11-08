@@ -66,38 +66,33 @@ class Settings:
         self.keepalive_enabled = _flag("KOTAK_KEEPALIVE", True)
         self.login_attempts = _int("KOTAK_LOGIN_ATTEMPTS", 3)
 
-        # --- Angel One SmartAPI (market data + optional execution) --------
-        # The data layer is Angel One, not Kotak: Kotak Neo publishes no
-        # historical candles, so candles and the instrument master come from
-        # SmartAPI. Credentials live in the encrypted store, these are the
-        # non-secret knobs.
-        self.angel_environment = os.getenv("ANGEL_ENVIRONMENT", "prod")
-        # SmartAPI edge headers are deployment-specific; never bake an IP or
-        # MAC address into the client. Leave the public IP empty to detect the
-        # current egress address, or set it when the deployment has a reserved IP.
-        self.angel_client_public_ip = os.getenv("ANGEL_CLIENT_PUBLIC_IP", "").strip()
-        self.angel_client_local_ip = os.getenv("ANGEL_CLIENT_LOCAL_IP", "").strip()
-        self.angel_mac_address = os.getenv("ANGEL_MAC_ADDRESS", "").strip()
-        self.angel_user_agent = os.getenv(
-            "ANGEL_USER_AGENT",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        ).strip()
-        self.angel_session_ttl_seconds = _int("ANGEL_SESSION_TTL_SECONDS", 8 * 60 * 60)
-        self.angel_session_file = os.getenv("ANGEL_SESSION_FILE", os.path.join(self.data_dir, "angel_session.json"))
-        self.angel_instrument_file = os.getenv(
-            "ANGEL_INSTRUMENT_FILE", os.path.join(self.data_dir, "angel_instruments.json")
+        # --- FYERS API v3 (market data) ------------------------------------
+        # FYERS is the data layer: instrument master, live quotes and historical
+        # candles all come from FYERS API v3. Kotak Neo publishes no historical
+        # candles, so candles come from FYERS /history. Credentials live in the
+        # encrypted store, these are the non-secret knobs.
+        self.fyers_app_id = os.getenv("FYERS_APP_ID", "").strip()
+        self.fyers_secret_id = os.getenv("FYERS_SECRET_ID", "").strip()
+        self.fyers_redirect_uri = os.getenv("FYERS_REDIRECT_URI", "").strip()
+        self.fyers_redirect_path = os.getenv("FYERS_REDIRECT_PATH", "/fyers/callback").strip() or "/fyers/callback"
+        self.fyers_pin = os.getenv("FYERS_PIN", "").strip()
+        self.fyers_access_token_env = os.getenv("FYERS_ACCESS_TOKEN", "").strip()
+        self.fyers_token_file = os.getenv(
+            "FYERS_TOKEN_FILE", os.path.join(self.data_dir, "fyers_token.json")
         )
-        self.angel_sync_url = os.getenv(
-            "ANGEL_SYNC_URL",
-            "https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json",
+        self.fyers_rate_limit_per_second = _float("FYERS_RATE_LIMIT_PER_SECOND", 3.0)
+        self.fyers_max_symbols_per_call = _int("FYERS_MAX_SYMBOLS_PER_CALL", 50)
+        self.fyers_retries = _int("FYERS_RETRIES", 3)
+        self.fyers_retry_backoff_seconds = _float("FYERS_RETRY_BACKOFF_SECONDS", 0.5)
+        self.fyers_history_days_default = _int("FYERS_HISTORY_DAYS_DEFAULT", 30)
+        self.fyers_history_days_max = _int("FYERS_HISTORY_DAYS_MAX", 366)
+        self.fyers_poll_seconds_open = _float("FYERS_POLL_SECONDS_OPEN", 1.0)
+        self.fyers_poll_seconds_closed = _float("FYERS_POLL_SECONDS_CLOSED", 60.0)
+        self.fyers_socket_stale_seconds = _int("FYERS_SOCKET_STALE_SECONDS", 180)
+        self.fyers_symbol_master_url = os.getenv(
+            "FYERS_SYMBOL_MASTER_URL", "https://public.fyers.in/sym_details/{}.json"
         )
-        self.angel_rate_limit_per_second = _int("ANGEL_RATE_LIMIT_PER_SECOND", 3)
-        #: SmartAPI refuses more than a handful of symbols per quote/LTP call.
-        self.angel_max_tokens_per_call = _int("ANGEL_MAX_TOKENS_PER_CALL", 50)
-        #: SmartAPI caps a single historical call; long ranges are chunked.
-        self.angel_history_days_default = _int("ANGEL_HISTORY_DAYS_DEFAULT", 30)
-        self.angel_history_days_max = _int("ANGEL_HISTORY_DAYS_MAX", 1800)
+        self.fyers_symbol_master_ttl = _int("FYERS_SYMBOL_MASTER_TTL", 12 * 60 * 60)
 
         # --- market data provider ----------------------------------------
         # Which broker serves market data (quotes, LTP, candles, live feed).
@@ -150,7 +145,7 @@ class Settings:
         self.default_execution_broker = os.getenv("DEFAULT_EXECUTION_BROKER", "kotak").strip().lower()
         self.execution_brokers = [
             value.strip().lower()
-            for value in os.getenv("EXECUTION_BROKERS", "kotak,angel").split(",")
+            for value in os.getenv("EXECUTION_BROKERS", "kotak").split(",")
             if value.strip()
         ]
         #: When two brokers hold a copy of the same position this is the size

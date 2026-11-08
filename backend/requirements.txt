@@ -1,14 +1,11 @@
-# AlphaTradePro backend. Ranges (not exact pins) on purpose:
-# https://github.com/Kotak-Neo/Kotak-neo-api-v2 pins ancient exact versions
-# (numpy==2.1.0, pandas==2.2.3, PyJWT==2.6.0, websockets==8.1, ...).
-# Exact pins fight those and break the Docker build on Render.
-# Ranges let pip resolve one compatible set; the SDK is installed
-# with --no-deps (see Dockerfile.render) so it can't downgrade us.
+# AlphaTradePro backend — Angel One purged, FYERS API v3 is the data layer.
+# Pinned versions keep the Render build deterministic.
+# websockets==8.1 + wsproto>=1.2,<2 avoid the Render uvicorn/websocket crash.
 
 fastapi>=0.115,<1
 uvicorn[standard]>=0.30,<1
 wsproto>=1.2,<2
-websockets>=12,<16
+websockets==8.1
 pydantic>=2.7,<3
 pydantic-settings>=2,<3
 python-dotenv>=1.0,<2
@@ -17,7 +14,6 @@ sqlalchemy>=2,<3
 asyncpg>=0.30,<1
 aiosqlite>=0.20,<1
 httpx>=0.27,<1
-pyotp>=2.9,<3
 PyJWT>=2.6,<3
 cryptography>=42,<46
 pandas>=2.2,<3
@@ -29,8 +25,3 @@ qrcode>=7.4,<9
 fyers-apiv3
 ably>=2.0.0,<4
 structlog>=24,<26
-# NOTE: no Angel One SmartAPI SDK here on purpose. Every SmartAPI call in
-# backend/angel/ is plain HTTP over `requests` (login, refresh, candles,
-# quotes, orders, instrument master), so no third-party SDK is imported and
-# none is needed. `smartapi-python` exists on PyPI, but adding it would only
-# be dead weight and another way for the Render build to fail.
