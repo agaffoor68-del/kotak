@@ -7,7 +7,7 @@
 # Dockerfile.render (installs backend/requirements.txt). This file exists
 # so the service also builds under Render's default Python runtime.
 #
-# Angel One purged — FYERS API v3 is the data layer. Kotak Neo remains
+# Angel One purged — FYERS API v3 is the data layer. Kotak Neo remains.
 # the execution broker.
 
 fastapi>=0.115,<1
