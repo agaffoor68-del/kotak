@@ -20,7 +20,8 @@ RUN apt-get update && \
 COPY backend/requirements.txt /tmp/requirements.txt
 
 RUN python -m pip install --upgrade pip setuptools wheel && \
-    python -m pip install -r /tmp/requirements.txt
+    python -m pip install -r /tmp/requirements.txt && \
+    python -m pip install --no-deps fyers-apiv3
 
 # Kotak SDK is optional in CI/Render; do not crash build if package is unavailable.
 # --no-deps: the SDK pins ancient exact versions (numpy==2.1.0, pandas==2.2.3,
