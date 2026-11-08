@@ -2,7 +2,6 @@ FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore \
     TZ=Asia/Kolkata \
     PORT=8000
@@ -29,7 +28,7 @@ RUN python -m pip install --upgrade pip setuptools wheel && \
 # Its real runtime needs (requests, websocket-client, six, ...) are already
 # covered by requirements.txt or install explicitly below.
 RUN python -m pip install --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" || echo "Kotak SDK install skipped (optional)"
-RUN python -m pip install "websocket-client>=1.8,<2" "websockets>=8.1,<16" "wsproto>=1.2,<2" six python-dateutil || true
+RUN python -m pip install "websocket-client>=1.8,<2" "websockets==8.1" "wsproto>=1.2,<2" six python-dateutil || true
 
 # Copy app code — keep repo layout (/app/backend/...) so `backend.main:app` imports work
 COPY backend/ /app/backend/
@@ -48,4 +47,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # NOTE: shell form so ${PORT} expands at runtime (Render injects $PORT).
 # App lives at backend/main.py -> backend.main:app (there is no `app` package).
-CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips=*
+CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --ws wsproto --proxy-headers --forwarded-allow-ips=*
