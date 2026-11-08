@@ -154,7 +154,7 @@ def upsert_candles(token: str, exchange_segment: str, interval: str, rows: list[
             cursor.executemany(
                 """
                 INSERT INTO candles (token, exchange_segment, interval, bucket, open, high, low, close, volume, trades, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,1,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(token, exchange_segment, interval, bucket) DO UPDATE SET
                     high   = MAX(candles.high, excluded.high),
                     low    = MIN(candles.low, excluded.low),
