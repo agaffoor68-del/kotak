@@ -15,7 +15,8 @@ WORKDIR /app
 COPY backend/requirements.txt ./backend-requirements.txt
 RUN apt-get update \
   && apt-get install -y --no-install-recommends build-essential curl git \
-  && pip install -r backend-requirements.txt \
+  && python -m pip install -r backend-requirements.txt \
+  && python -m pip install --no-cache-dir "uvicorn[standard]==0.30.0" \
   && pip install --no-deps fyers-apiv3 \
   && pip install --no-deps "git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client" || echo "Kotak SDK install skipped (optional)" \
   && pip install "websocket-client>=1.8,<2" "websockets==8.1" "wsproto>=1.2,<2" six python-dateutil || true \
