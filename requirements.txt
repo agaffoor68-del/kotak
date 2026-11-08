@@ -11,6 +11,7 @@
 # the execution broker.
 
 fastapi>=0.115,<1
+uvicorn[standard]==0.30.0
 wsproto>=1.2,<2
 websockets==8.1
 pydantic>=2.7,<3

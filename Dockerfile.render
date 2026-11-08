@@ -21,6 +21,7 @@ COPY backend/requirements.txt /tmp/requirements.txt
 
 RUN python -m pip install --upgrade pip setuptools wheel && \
     python -m pip install -r /tmp/requirements.txt && \
+    pip install --no-cache-dir "uvicorn[standard]==0.30.0" && \
     python -m pip install --no-deps fyers-apiv3
 
 # Kotak SDK is optional in CI/Render; do not crash build if package is unavailable.
@@ -48,4 +49,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # NOTE: shell form so ${PORT} expands at runtime (Render injects $PORT).
 # App lives at backend/main.py -> backend.main:app (there is no `app` package).
-CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --ws wsproto --proxy-headers --forwarded-allow-ips=*
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "10000", "--ws", "wsproto"]
