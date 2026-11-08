@@ -1,11 +1,13 @@
 # AlphaTradePro backend — Angel One purged, FYERS API v3 is the data layer.
 # Pinned versions keep the Render build deterministic.
 # websockets==8.1 + wsproto>=1.2,<2 avoid the Render uvicorn/websocket crash.
+# uvicorn is installed WITHOUT [standard] extras because the [standard] extra
+# pulls websockets>=13.0, which conflicts with Kotak Neo's websockets==8.1.
 
 fastapi>=0.115,<1
-uvicorn[standard]>=0.30,<1
+uvicorn>=0.30,<1
 wsproto>=1.2,<2
-websockets>=13,<16
+websockets==8.1
 pydantic>=2.7,<3
 pydantic-settings>=2,<3
 python-dotenv>=1.0,<2
@@ -17,7 +19,7 @@ httpx>=0.27,<1
 PyJWT>=2.6,<3
 cryptography>=42,<46
 pandas>=2.2,<3
-yfinance>=0.2,<1
+yfinance==0.2.58
 numpy>=2.1,<3
 openpyxl>=3.1,<4
 reportlab>=4,<5
